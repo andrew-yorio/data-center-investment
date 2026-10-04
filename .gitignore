@@ -9,3 +9,4 @@ playwright-report
 reports
 *.log
 scripts/localdb/10-schema.sql
+*.local

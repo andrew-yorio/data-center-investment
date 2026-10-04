@@ -1,5 +1,11 @@
 /** Swap the brand here. Everything (page, emails, disclaimer, footer) reads from this file. */
-export const BRAND_NAME = "Placeholder";
+export const BRAND_NAME = "ComputeStake";
+
+/**
+ * Logo file in public/ (e.g. "/logo.svg"), shown in the header, footer and
+ * privacy page. null shows the brand name as text instead.
+ */
+export const LOGO_SRC: string | null = null;
 
 /** Public contact address shown in the footer, FAQ and privacy policy. */
 export const CONTACT_EMAIL = "hello@example.com";

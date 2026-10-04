@@ -8,7 +8,7 @@ const RISKS = [
   },
   {
     title: "No site or timeline is final.",
-    body: "Site selection is underway. We don't yet know where the data center will be built or when.",
+    body: "Site selection is underway. We don't yet know where the modules will be installed or when.",
   },
   {
     title: "Returns are not guaranteed.",

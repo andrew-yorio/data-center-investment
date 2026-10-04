@@ -6,8 +6,8 @@ import { Silhouette } from "./Silhouette";
 const Scene = lazy(() => import("../scene/Scene"));
 
 const BEAT_COPY = [
-  { label: "Exterior", line: "Infrastructure, owned by more people." },
-  { label: "Server hall", line: "Inside: aisle after aisle of compute." },
+  { label: "Modular campus", line: "Infrastructure, owned by more people." },
+  { label: "Inside a module", line: "Inside each module: rows of compute." },
   { label: "Rack", line: "Every rack is real, physical work." },
   { label: "Chip", line: "Down to the silicon doing it." },
   { label: "Your share", line: "A share sized to what you'd put in." },
@@ -35,7 +35,7 @@ function Ctas() {
 }
 
 const INTRO_LEDE =
-  "We're planning a data center that everyday people could help fund. Under the planned structure, investors would share in its profits in proportion to what each put in. Right now we're only gauging interest.";
+  "We're planning a modular data center, built from prefabricated modules, that everyday people could help fund. Under the planned structure, investors would share in its profits in proportion to what each put in. Right now we're only gauging interest.";
 
 /** Reduced-motion intro: no WebGL, no scrubbing. A static silhouette and the five beats in order. */
 function StaticIntro() {
@@ -49,7 +49,7 @@ function StaticIntro() {
         <Ctas />
         <div className="mt-20 grid gap-12 md:grid-cols-12 md:items-end">
           <Silhouette className="md:col-span-7" />
-          <ol className="space-y-5 md:col-span-5" aria-label="From the building to your share">
+          <ol className="space-y-5 md:col-span-5" aria-label="From the campus to your share">
             {BEAT_COPY.slice(1).map((b) => (
               <li key={b.label} className="border-t border-white/20 pt-4">
                 <span className="font-mono text-sm text-white/65">{b.label}</span>

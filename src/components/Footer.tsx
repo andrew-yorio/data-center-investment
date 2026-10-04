@@ -1,12 +1,13 @@
 import { BRAND_NAME, CONTACT_EMAIL } from "../../shared/brand";
 import { Disclaimer } from "./Disclaimer";
+import { Logo } from "./Logo";
 
 export function Footer() {
   return (
     <footer className="on-dark gutter bg-night-950 py-16 text-white md:py-20">
       <div className="mx-auto grid max-w-[96rem] gap-10 md:grid-cols-12">
         <div className="md:col-span-4">
-          <p className="font-heading text-h3">{BRAND_NAME}</p>
+          <Logo />
           <p className="mt-4">
             <a href={`mailto:${CONTACT_EMAIL}`} className="underline underline-offset-4 hover:text-white/80">{CONTACT_EMAIL}</a>
           </p>

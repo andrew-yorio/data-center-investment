@@ -20,7 +20,8 @@ export async function sendConfirmationEmail(env: Env, to: string, name: string, 
     disclaimer(),
   ].join("\n");
 
-  if (!env.EMAIL_API_KEY) {
+  const apiKey = env.EMAIL_API_KEY?.trim();
+  if (!apiKey) {
     if (env.DEV_LOG_EMAILS === "1") {
       console.log(`[dev email] to=${to} confirm=${confirmUrl}`);
       return;
@@ -30,9 +31,9 @@ export async function sendConfirmationEmail(env: Env, to: string, name: string, 
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { authorization: `Bearer ${env.EMAIL_API_KEY}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({
-      from: env.EMAIL_FROM ?? `${BRAND_NAME} <${CONTACT_EMAIL}>`,
+      from: env.EMAIL_FROM?.trim() || `${BRAND_NAME} <${CONTACT_EMAIL}>`,
       to: [to],
       subject,
       text,
