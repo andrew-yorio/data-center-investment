@@ -13,7 +13,7 @@ const FAQS: { q: string; a: ReactNode }[] = [
   },
   {
     q: "What happens after I sign up?",
-    a: "We email you a link to confirm your address. Once you confirm, you're on the list. We'll send updates as project details are finalized, and first notice if an official round opens. You decide then, with the full offering documents in front of you.",
+    a: "We email you a link to confirm your address. Once you confirm, you're on the list. We'll send updates as project details are finalized, and let you know if an official round opens. You decide then, with the full offering documents in front of you.",
   },
   {
     q: "Who will be able to invest, and is there a minimum?",

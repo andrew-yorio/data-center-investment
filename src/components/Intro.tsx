@@ -10,7 +10,7 @@ const BEAT_COPY = [
   { label: "Server hall", line: "Inside: aisle after aisle of compute." },
   { label: "Rack", line: "Every rack is real, physical work." },
   { label: "Chip", line: "Down to the silicon doing it." },
-  { label: "Your share", line: "A share sized to what you put in." },
+  { label: "Your share", line: "A share sized to what you'd put in." },
 ] as const;
 
 function Ctas() {
@@ -19,7 +19,7 @@ function Ctas() {
       <a
         href="#signup"
         onClick={(e) => { e.preventDefault(); scrollToId("signup"); }}
-        className="rounded-control bg-white px-6 py-3.5 font-semibold text-ink transition-colors duration-150 ease-crisp hover:bg-paper"
+        className="rounded-control bg-white px-6 py-3.5 font-semibold text-ink transition-[background-color] duration-150 ease-crisp hover:bg-paper"
       >
         Join the list
       </a>
@@ -35,7 +35,7 @@ function Ctas() {
 }
 
 const INTRO_LEDE =
-  "We're planning a data center that everyday people can help fund, with a share of its profits in proportion to what each person puts in. Right now we're only gauging interest.";
+  "We're planning a data center that everyday people could help fund. Under the planned structure, investors would share in its profits in proportion to what each put in. Right now we're only gauging interest.";
 
 /** Reduced-motion intro: no WebGL, no scrubbing. A static silhouette and the five beats in order. */
 function StaticIntro() {
@@ -86,7 +86,7 @@ export function Intro() {
 
   // Map page scroll to intro progress and lift only the beat index into React.
   useEffect(() => {
-    if (reduced) return;
+    if (reduced || !canRender3d) return;
     const el = trackRef.current;
     if (!el) return;
     let raf = 0;
@@ -110,9 +110,9 @@ export function Intro() {
       io.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [reduced]);
+  }, [reduced, canRender3d]);
 
-  if (reduced) return <StaticIntro />;
+  if (reduced || !canRender3d) return <StaticIntro />;
 
   return (
     <section
@@ -125,11 +125,6 @@ export function Intro() {
       <div className="sticky top-0 h-svh overflow-hidden">
         {/* Night gradient paints instantly and stays as the fallback if WebGL is unavailable. */}
         <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(120%_80%_at_70%_30%,var(--color-night-800)_0%,var(--color-night-950)_60%)]" />
-        {!canRender3d && (
-          <div className="absolute inset-x-0 bottom-[8%] flex justify-center opacity-70">
-            <Silhouette className="w-[min(90vw,56rem)]" />
-          </div>
-        )}
         {loadScene && (
           <Suspense fallback={null}>
             <Scene mobile={mobile} active={inView} />
@@ -138,6 +133,7 @@ export function Intro() {
 
         {/* Legibility scrim behind the overlaid headline. */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-linear-to-t from-night-950/80 via-night-950/10 to-transparent" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-linear-to-b from-night-950/75 to-transparent" />
 
         <div className="gutter relative mx-auto flex h-full max-w-[96rem] flex-col justify-end pb-[max(3rem,8svh)]">
           <div className="grid">
@@ -145,7 +141,7 @@ export function Intro() {
               const active = beat === i;
               const Tag = i === 0 ? "h1" : "p";
               return (
-                <div key={b.label} className="col-start-1 row-start-1 self-end" aria-hidden={i === 0 ? undefined : !active}>
+                <div key={b.label} className="col-start-1 row-start-1 self-end">
                   <Tag
                     id={i === 0 ? "intro-title" : undefined}
                     data-active={active}
@@ -154,14 +150,14 @@ export function Intro() {
                     {b.line}
                   </Tag>
                   {i === 0 && (
-                    <div className={`transition-opacity duration-300 ${active ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+                    <div inert={!active} className={`transition-opacity duration-300 ${active ? "opacity-100" : "pointer-events-none opacity-0"}`}>
                       <p className="measure mt-6 text-body-lg text-white/85">{INTRO_LEDE}</p>
                       <Ctas />
                     </div>
                   )}
                   {i === 4 && (
-                    <p data-active={active} className="beat-line measure mt-6 text-body text-white/80">
-                      This describes the planned structure, not an offer. Profits aren't guaranteed and you could lose money.
+                    <p data-active={active} className="beat-line measure mt-6 text-body-lg font-semibold text-white">
+                      That's the plan if the project goes ahead. It isn't an offer: profits aren't guaranteed and you could lose money.
                     </p>
                   )}
                 </div>

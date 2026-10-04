@@ -86,5 +86,10 @@ export function useTurnstile(container: RefObject<HTMLElement | null>, form: Ref
     if (widgetId.current) window.turnstile?.reset(widgetId.current);
   }, []);
 
-  return { token, reset, failed };
+  const remove = useCallback(() => {
+    if (widgetId.current) window.turnstile?.remove(widgetId.current);
+    widgetId.current = null;
+  }, []);
+
+  return { token, reset, remove, failed };
 }

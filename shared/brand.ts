@@ -4,6 +4,9 @@ export const BRAND_NAME = "Placeholder";
 /** Public contact address shown in the footer, FAQ and privacy policy. */
 export const CONTACT_EMAIL = "hello@example.com";
 
+/** Legal operator named in the privacy policy. Replace before launch. */
+export const LEGAL_ENTITY = "[Legal entity name], [postal address]";
+
 /** Values stored in signups.investment_range, with their display labels. */
 export const INVESTMENT_RANGES = [
   { value: "under_500", label: "Under $500" },

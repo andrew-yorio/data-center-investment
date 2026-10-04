@@ -32,7 +32,7 @@ export function Risks() {
         {RISKS.map((r) => (
           <div key={r.title} className="border-t border-rule py-6">
             <dt className="font-heading text-h3">{r.title}</dt>
-            <dd className="mt-2 text-ink-muted">{r.body}</dd>
+            <dd className="mt-2 text-body-lg text-ink-muted">{r.body}</dd>
           </div>
         ))}
       </dl>

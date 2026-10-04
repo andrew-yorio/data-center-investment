@@ -52,9 +52,10 @@ export function Signup() {
   const [submitted, setSubmitted] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const confirm = useConfirmStatus();
-  const { token, reset: resetTurnstile, failed: turnstileFailed } = useTurnstile(turnstileRef, formRef);
+  const { token, reset: resetTurnstile, remove: removeTurnstile, failed: turnstileFailed } = useTurnstile(turnstileRef, formRef);
   const uid = useId();
 
   const clientErrors = validate(values);
@@ -68,7 +69,8 @@ export function Signup() {
 
   useEffect(() => {
     if (status === "success") successRef.current?.focus();
-  }, [status]);
+    if (status === "error") errorRef.current?.focus();
+  }, [status, formMessage]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -92,6 +94,7 @@ export function Signup() {
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; fields?: Errors; message?: string };
       if (res.ok && data.ok) {
+        removeTurnstile();
         setStatus("success");
         return;
       }
@@ -121,13 +124,13 @@ export function Signup() {
 
   return (
     <section id="signup" aria-labelledby="signup-title" className="section-pad gutter scroll-mt-16 border-t border-rule">
-      <div className="mx-auto grid max-w-[96rem] gap-x-8 gap-y-12 md:grid-cols-12">
-        <div className="md:col-span-5 lg:col-span-4">
+      <div className="mx-auto grid max-w-[96rem] gap-x-8 gap-y-12 lg:grid-cols-12">
+        <div className="lg:col-span-4">
           <h2 id="signup-title" tabIndex={-1} className="font-heading text-h2 outline-none">
             Join the list
           </h2>
           <p className="measure mt-6 text-body-lg text-ink-muted">
-            Register your interest and get notified first. Nothing is paid, and nothing you tell us here is a commitment.
+            Register your interest and get notified as plans firm up. Nothing is paid, and nothing you tell us here is a commitment.
           </p>
           <ul className="mt-8 space-y-3 text-body">
             <li className="border-t border-rule pt-3">We'll email you a link to confirm your address.</li>
@@ -138,7 +141,7 @@ export function Signup() {
           </ul>
         </div>
 
-        <div className="md:col-span-7 lg:col-span-6 lg:col-start-6">
+        <div className="lg:col-span-7 lg:col-start-6">
           {confirm && (
             <div
               role="status"
@@ -250,7 +253,11 @@ export function Signup() {
                 </div>
 
                 <div aria-live="polite" className="empty:hidden">
-                  {formMessage && <p className="border-l-4 border-danger bg-paper p-4 text-small font-semibold text-danger">{formMessage}</p>}
+                  {formMessage && (
+                    <p ref={errorRef} tabIndex={-1} className="border-l-4 border-danger bg-paper p-4 text-small font-semibold text-danger outline-none">
+                      {formMessage}
+                    </p>
+                  )}
                 </div>
 
                 <div>

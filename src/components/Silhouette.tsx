@@ -29,7 +29,7 @@ export function Silhouette({ className = "" }: { className?: string }) {
       </svg>
       <figcaption className="mt-3 font-mono text-sm text-white/70">
         <span className="mr-2 inline-block size-2.5 bg-share-400 align-middle" aria-hidden="true" />
-        Your share, in proportion to what you put in
+        Planned: each share in proportion to what's put in, if it goes ahead
       </figcaption>
     </figure>
   );

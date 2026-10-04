@@ -2,7 +2,7 @@ import { Section } from "./Section";
 
 const STEPS = [
   {
-    title: "Join the list",
+    title: "Register interest",
     body: "Tell us roughly how much you might invest. Nothing is paid and nothing is binding.",
   },
   {
@@ -11,7 +11,7 @@ const STEPS = [
   },
   {
     title: "Decide when it's real",
-    body: "When the official round opens through a registered, SEC-compliant funding platform, you get first notice and decide then.",
+    body: "If an official round opens, it will be through a registered funding portal. We'll let you know, and you decide then.",
   },
 ];
 

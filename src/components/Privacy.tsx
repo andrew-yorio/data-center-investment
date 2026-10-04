@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BRAND_NAME, CONTACT_EMAIL } from "../../shared/brand";
+import { BRAND_NAME, CONTACT_EMAIL, LEGAL_ENTITY } from "../../shared/brand";
 import { Footer } from "./Footer";
 
 const LAST_UPDATED = "October 3, 2026";
@@ -25,7 +25,7 @@ export function Privacy() {
       <main className="gutter section-pad">
         <div className="mx-auto max-w-[72ch]">
           <h1 className="font-heading text-h2">Privacy policy</h1>
-          <p className="mt-4 text-ink-muted">Last updated {LAST_UPDATED}. Draft pending legal review.</p>
+          <p className="mt-4 text-ink-muted">Last updated {LAST_UPDATED}.</p>
           <p className="mt-8 text-body-lg">
             This policy explains what {BRAND_NAME} collects when you register interest on this site, why, and how to have it deleted.
           </p>
@@ -34,7 +34,7 @@ export function Privacy() {
             <ul>
               <li>Your name and email address.</li>
               <li>The investment range you chose, and your acknowledgment that this is non-binding.</li>
-              <li>The IP address your sign-up came from, taken from the connection by our hosting provider. We never ask you for it.</li>
+              <li>The IP address your sign-up came from, taken from the connection by our hosting provider. We never ask you for it. It is stored with your sign-up and deleted with it.</li>
               <li>Your browser's user-agent string (the browser and operating system name it reports).</li>
               <li>Whether and when you confirmed your email address.</li>
             </ul>
@@ -61,15 +61,19 @@ export function Privacy() {
           </Block>
 
           <Block title="How long we keep it">
-            <p>Unconfirmed sign-ups are deleted after 30 days. Confirmed sign-ups are kept until the project's interest phase ends or you ask us to delete them. Rate-limiting records of IP addresses are deleted after 24 hours.</p>
+            <p>Unconfirmed sign-ups are deleted after 30 days. Confirmed sign-ups, including the stored IP address, are kept until this interest-gauging phase ends (when an offering opens or the project is abandoned) or until you ask us to delete them, whichever comes first. Rate-limiting records of IP addresses are deleted after 24 hours.</p>
           </Block>
 
           <Block title="Deleting or correcting your information">
             <p>Email {mail} from the address you signed up with and tell us what you'd like deleted or corrected. We'll confirm when it's done. You can also reply to any email from us to stop further messages.</p>
           </Block>
 
+          <Block title="Your rights">
+            <p>Depending on where you live, including California and other US states with privacy laws, you may have the right to know what personal information we hold about you, get a copy of it, correct it, and have it deleted. We don't sell or share personal information for advertising. To use any of these rights, email {mail}. We won't treat you differently for doing so.</p>
+          </Block>
+
           <Block title="Contact">
-            <p>Questions about this policy: {mail}.</p>
+            <p>This site is operated by {LEGAL_ENTITY}. Questions about this policy: {mail}.</p>
           </Block>
         </div>
       </main>
