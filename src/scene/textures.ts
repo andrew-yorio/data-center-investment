@@ -309,6 +309,56 @@ export function paintedMetalMaps(color: string, res = 256): MapSet {
   }, { normalStrength: 0.8 });
 }
 
+/** Corrugated painted-steel cladding for prefab modules: vertical trapezoid ribs, panel seams. */
+export function corrugatedMaps(color: string, res = 512): MapSet {
+  return mapSet(res, res, (a, h, o) => {
+    a.fillStyle = color;
+    a.fillRect(0, 0, res, res);
+    fbm(a, res, res, 231, [[8, 0.14], [128, 0.08]], "overlay");
+    o.fillStyle = orm(1, 0.42, 0.55);
+    o.fillRect(0, 0, res, res);
+    fbm(o, res, res, 233, [[32, 0.2]], "overlay");
+    const ribs = 10;
+    const rw = res / ribs;
+    for (let i = 0; i < ribs; i++) {
+      const x = i * rw;
+      // Profile: flat, slope up, crest, slope down. Shading in albedo, relief in height.
+      const ga = a.createLinearGradient(x, 0, x + rw, 0);
+      ga.addColorStop(0, "rgba(0,0,0,0.22)");
+      ga.addColorStop(0.3, "rgba(0,0,0,0.05)");
+      ga.addColorStop(0.45, "rgba(255,255,255,0.12)");
+      ga.addColorStop(0.6, "rgba(255,255,255,0.06)");
+      ga.addColorStop(0.75, "rgba(0,0,0,0.12)");
+      ga.addColorStop(1, "rgba(0,0,0,0.22)");
+      a.fillStyle = ga;
+      a.fillRect(x, 0, rw, res);
+      const gh = h.createLinearGradient(x, 0, x + rw, 0);
+      gh.addColorStop(0, grey(90));
+      gh.addColorStop(0.3, grey(90));
+      gh.addColorStop(0.45, grey(200));
+      gh.addColorStop(0.6, grey(200));
+      gh.addColorStop(0.75, grey(90));
+      gh.addColorStop(1, grey(90));
+      h.fillStyle = gh;
+      h.fillRect(x, 0, rw, res);
+    }
+    // Horizontal panel seam and a rust-free drip line.
+    a.fillStyle = "rgba(0,0,0,0.5)";
+    a.fillRect(0, res / 2 - 2, res, 4);
+    h.fillStyle = grey(40);
+    h.fillRect(0, res / 2 - 2, res, 4);
+    const r = rng(235);
+    for (let i = 0; i < 10; i++) {
+      const x = r() * res;
+      const grd = a.createLinearGradient(0, res / 2, 0, res / 2 + res * 0.25);
+      grd.addColorStop(0, "rgba(30,34,40,0.25)");
+      grd.addColorStop(1, "rgba(30,34,40,0)");
+      a.fillStyle = grd;
+      a.fillRect(x, res / 2, 3, res * 0.25);
+    }
+  }, { normalStrength: 2.2 });
+}
+
 /** Lit office floors behind a curtain wall: an emissive map with slabs, ceiling fixtures and a few dark bays. */
 export function officeGlassTexture(res = 512): CanvasTexture {
   const [c, g] = make(res, res);

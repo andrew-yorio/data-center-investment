@@ -1,11 +1,21 @@
 import { MathUtils, Vector3 } from "three";
 
-/** Racks run in rows along z; the camera walks the center cold aisle at x = 0. */
-export const RACK = { width: 0.6, height: 2.2, depth: 1.1, pitch: 0.6, zStart: -16, zEnd: 14 } as const;
-export const ROW_X = 1.6; // first row centers at ±1.6, so rack fronts face the aisle at x = ±1.05
-export const ROW_PITCH = 3.4;
-export const TARGET_Z = RACK.zStart + RACK.pitch * 15; // the rack the camera zooms into
+/**
+ * A modular campus: prefabricated data-hall modules stand side by side along
+ * x, each 18 m long (z), joined at their far end by an enclosed spine
+ * corridor. The camera enters the module at x = 0 through its end door and
+ * walks its single cold aisle at x = 0.
+ */
+export const MODULE = { w: 5.0, h: 4.2, len: 18, pitch: 7.2, count: 7, ceiling: 3.2, base: 0.35 } as const;
+/** Modules stand on a steel plinth; everything inside the module is in floor-relative coordinates. */
+export const FLOOR_Y = MODULE.base;
+export const SPINE = { w: 3.2, h: 4.2, z: -MODULE.len / 2 - 1.6 } as const;
+export const RACK = { width: 0.6, height: 2.2, depth: 1.1, pitch: 0.6, zStart: -8.1, zEnd: 7.5 } as const;
+export const ROW_X = 1.6; // rows at ±1.6, so rack fronts face the aisle at x = ±1.05
+export const TARGET_Z = RACK.zStart + RACK.pitch * 4; // the rack the camera zooms into
 export const RACK_FRONT_X = -ROW_X + RACK.depth / 2; // -1.05
+/** The module's end door the camera comes through, and the far door into the spine. */
+export const DOOR = { w: 1.9, h: 2.4 } as const;
 
 /**
  * The open rack holds a 2U server pulled out on its rails with the lid off.
@@ -22,15 +32,8 @@ export const CPU2_Z = TARGET_Z + 0.105;
 export const DIE_SIZE = 0.034;
 export const DIE_Y = BOARD_Y + 0.0066;
 export const DIE: [number, number, number] = [BOARD_CX, DIE_Y, CPU_Z];
-
-export const BUILDING = { w: 60, h: 14, d: 36 } as const;
-/** Glass office annex at the building's front-right corner. */
-export const ANNEX = { w: 18, h: 7.2, d: 10, x: BUILDING.w / 2 - 9, z: BUILDING.d / 2 + 5 } as const;
-export const HALL_CEILING = 5.0;
-/** Entrance: glass doors in the facade, a small lobby, then double doors into the hall. */
-export const DOOR = { w: 4.2, h: 3.1 } as const;
-export const LOBBY = { halfW: 4.5, h: 3.4, z0: 15.3, z1: BUILDING.d / 2 } as const; // hall front wall sits at z0
-export const HALL_DOOR = { w: 3.0, h: 3.0 } as const;
+/** The die in world space (module floor height added), for the camera and depth of field. */
+export const DIE_WORLD: [number, number, number] = [BOARD_CX, DIE_Y + FLOOR_Y, CPU_Z];
 
 interface Key {
   p: number;
@@ -43,17 +46,18 @@ interface Key {
  * linearly and the camera's distance from it interpolates in log space, so
  * each power-of-ten step takes the same scroll distance.
  */
+const F = FLOOR_Y;
 const KEYS: Key[] = [
-  { p: 0.0, pos: [62, 24, 96], target: [0, 6, 0] },
-  { p: 0.12, pos: [26, 8, 64], target: [0, 5, 18] },
-  { p: 0.2, pos: [0, 2.7, 19.5], target: [0, 2.2, -2] },
-  { p: 0.3, pos: [0, 1.9, 9], target: [0, 1.6, -14] },
-  { p: 0.42, pos: [0.35, 1.7, TARGET_Z + 3.0], target: [RACK_FRONT_X, 1.3, TARGET_Z] },
-  { p: 0.52, pos: [RACK_FRONT_X + 1.0, BOARD_Y + 0.55, TARGET_Z + 0.55], target: [BOARD_CX, BOARD_Y + 0.02, TARGET_Z - 0.03] },
-  { p: 0.62, pos: [BOARD_CX + 0.1, DIE_Y + 0.21, CPU_Z + 0.07], target: DIE },
-  { p: 0.74, pos: [BOARD_CX + 0.012, DIE_Y + 0.055, CPU_Z + 0.008], target: DIE },
-  { p: 0.84, pos: [BOARD_CX + 0.003, DIE_Y + 0.016, CPU_Z + 0.002], target: DIE },
-  { p: 1.0, pos: [BOARD_CX + 0.0015, DIE_Y + 0.0105, CPU_Z + 0.001], target: DIE },
+  { p: 0.0, pos: [52, 17, 78], target: [0, 3, 0] },
+  { p: 0.12, pos: [12, 5, 40], target: [0, 2.5, 9] },
+  { p: 0.2, pos: [0, 1.75 + F, MODULE.len / 2 + 1.6], target: [0, 1.6 + F, -6] },
+  { p: 0.3, pos: [0, 1.7 + F, 3.5], target: [0, 1.5 + F, -9] },
+  { p: 0.42, pos: [0.35, 1.7 + F, TARGET_Z + 3.0], target: [RACK_FRONT_X, 1.3 + F, TARGET_Z] },
+  { p: 0.52, pos: [RACK_FRONT_X + 1.0, BOARD_Y + 0.55 + F, TARGET_Z + 0.55], target: [BOARD_CX, BOARD_Y + 0.02 + F, TARGET_Z - 0.03] },
+  { p: 0.62, pos: [BOARD_CX + 0.1, DIE_Y + 0.21 + F, CPU_Z + 0.07], target: DIE_WORLD },
+  { p: 0.74, pos: [BOARD_CX + 0.012, DIE_Y + 0.055 + F, CPU_Z + 0.008], target: DIE_WORLD },
+  { p: 0.84, pos: [BOARD_CX + 0.003, DIE_Y + 0.016 + F, CPU_Z + 0.002], target: DIE_WORLD },
+  { p: 1.0, pos: [BOARD_CX + 0.0015, DIE_Y + 0.0105 + F, CPU_Z + 0.001], target: DIE_WORLD },
 ];
 
 const _a = new Vector3();

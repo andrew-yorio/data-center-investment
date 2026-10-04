@@ -1,21 +1,21 @@
 import { MeshReflectorMaterial } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, type Group, InstancedBufferAttribute, type InstancedMesh, MeshStandardMaterial, Object3D, type Points, type Texture } from "three";
-import { BUILDING, HALL_CEILING, HALL_DOOR, LOBBY, RACK, RACK_FRONT_X, ROW_PITCH, ROW_X, TARGET_Z, ramp } from "./path";
+import { AdditiveBlending, BackSide, BufferAttribute, BufferGeometry, Color, type Group, InstancedBufferAttribute, type InstancedMesh, MeshStandardMaterial, Object3D, Path, type Points, Shape, ShapeGeometry, type Texture } from "three";
+import { DOOR, FLOOR_Y, MODULE, RACK, RACK_FRONT_X, ROW_X, TARGET_Z, ramp } from "./path";
 import type { Quality } from "./quality";
 import { ceilingMaps, dotTexture, floorTileMaps, graphiteMaps, type MapSet, rackDoorMaps, rng, wallPanelMaps } from "./textures";
 import { ledMaterial, type LedMaterial } from "./materials";
 import { Server } from "./Server";
 
 const dummy = new Object3D();
-const INNER_W = BUILDING.w - 1;
-const INNER_D = BUILDING.d - 1;
+const INNER_W = MODULE.w - 0.2;
+const INNER_L = MODULE.len - 0.2;
+const CEIL = MODULE.ceiling;
 const ROW_LEN = RACK.zEnd - RACK.zStart + RACK.pitch;
 const ROW_MID = (RACK.zStart + RACK.zEnd) / 2;
 const U = 0.04445;
 const RACK_BASE = 0.1;
-const AISLE_W = ROW_PITCH - RACK.depth; // 2.3 m between back-to-back or face-to-face rows
 const STRIP = new Color("#dbe6ff").multiplyScalar(3.5); // HDR fixture emissive
 
 function tiled(set: MapSet, rx: number, ry: number): MapSet {
@@ -33,35 +33,44 @@ function pbr(set: MapSet, extra: Partial<MeshStandardMaterial> = {}): MeshStanda
   return m;
 }
 
-/** Row centre x and the direction its fronts face, for pair index k on side s. */
-function rowOf(s: number, k: number) {
-  const cx = s * (ROW_X + k * ROW_PITCH);
-  const faceDir = k % 2 === 0 ? -s : s; // even rows face the centre of their cold aisle
-  return { cx, faceDir, faceX: cx + faceDir * (RACK.depth / 2), backX: cx - faceDir * (RACK.depth / 2) };
+/** End wall of the module with its doorway cut out. ShapeGeometry UVs are in metres. */
+function endWallGeometry() {
+  const shape = new Shape();
+  shape.moveTo(-INNER_W / 2, 0);
+  shape.lineTo(INNER_W / 2, 0);
+  shape.lineTo(INNER_W / 2, CEIL);
+  shape.lineTo(-INNER_W / 2, CEIL);
+  shape.closePath();
+  const hole = new Path();
+  hole.moveTo(-DOOR.w / 2, 0);
+  hole.lineTo(DOOR.w / 2, 0);
+  hole.lineTo(DOOR.w / 2, DOOR.h);
+  hole.lineTo(-DOOR.w / 2, DOOR.h);
+  hole.closePath();
+  shape.holes.push(hole);
+  return new ShapeGeometry(shape);
 }
 
+/**
+ * Inside one module: a single cold aisle between two rows of racks, chimney
+ * containment up to a low ceiling, ladder trays, strip fixtures, and a door
+ * at the far end into the lit spine corridor.
+ */
 export function Hall({ q, reflections, progress }: { q: Quality; reflections: boolean; progress: { p: number } }) {
   const group = useRef<Group>(null);
   const bodies = useRef<InstancedMesh>(null);
   const fronts = useRef<InstancedMesh>(null);
-  const rears = useRef<InstancedMesh>(null);
-  const tops = useRef<InstancedMesh>(null);
-  const risers = useRef<InstancedMesh>(null);
   const leds = useRef<InstancedMesh>(null);
   const fixtures = useRef<InstancedMesh>(null);
   const housings = useRef<InstancedMesh>(null);
   const rungs = useRef<InstancedMesh>(null);
   const rails = useRef<InstancedMesh>(null);
   const bundles = useRef<InstancedMesh>(null);
-  const taps = useRef<InstancedMesh>(null);
-  const beams = useRef<InstancedMesh>(null);
-  const doorFrames = useRef<InstancedMesh>(null);
   const motes = useRef<Points>(null);
   const ledMat = useMemo<LedMaterial>(() => ledMaterial(), []);
 
-  const rowPairs = q.rowPairs;
   const perRow = Math.floor((RACK.zEnd - RACK.zStart) / RACK.pitch) + 1;
-  const rackCount = rowPairs * 2 * perRow;
+  const rackCount = 2 * perRow;
   const ledsPerRack = q.ledsPerRack;
 
   const tex = useMemo(() => {
@@ -72,22 +81,23 @@ export function Hall({ q, reflections, progress }: { q: Quality; reflections: bo
     const wall = wallPanelMaps(512);
     const ceiling = ceilingMaps(256);
     return {
-      floor: tiled(floor, INNER_W / 1.2, INNER_D / 1.2),
+      floor: tiled(floor, INNER_W / 1.2, INNER_L / 1.2),
       perf: pbr(tiled(perf, 0.5, ROW_LEN / 1.2)),
       door: pbr(door),
-      rearDoor: pbr(door, { color: new Color("#8a8f96") }),
       graphite: pbr(graphite),
-      wallLong: pbr(tiled(wall, INNER_W / 2, HALL_CEILING / 2)),
-      wallShort: pbr(tiled(wall, INNER_D / 2, HALL_CEILING / 2)),
-      ceiling: pbr(tiled(ceiling, INNER_W / 2.4, INNER_D / 2.4)),
+      wallLong: pbr(tiled(wall, INNER_L / 2, CEIL / 2)),
+      wallEnd: pbr(tiled(wall, 1 / 2, 1 / 2)),
+      panel: pbr(tiled(wall, ROW_LEN / 2, 0.5), { color: new Color("#d8dce2") }),
+      ceiling: pbr(tiled(ceiling, INNER_W / 2.4, INNER_L / 2.4)),
+      spine: new MeshStandardMaterial({ color: "#a7acb3", roughness: 0.7, side: BackSide }),
       steel: new MeshStandardMaterial({ color: "#8b9098", roughness: 0.45, metalness: 0.8 }),
       darkSteel: new MeshStandardMaterial({ color: "#3a3e45", roughness: 0.5, metalness: 0.7 }),
       cable: new MeshStandardMaterial({ color: "#14213a", roughness: 0.7, metalness: 0.1 }),
-      poly: new MeshStandardMaterial({ color: "#2a3340", roughness: 0.15, metalness: 0.2, transparent: true, opacity: 0.45, depthWrite: false }),
       fixture: new MeshStandardMaterial({ color: "#e8eef8", emissive: STRIP, emissiveIntensity: 1, roughness: 0.4 }),
       dot: dotTexture(64),
     };
   }, []);
+  const endGeom = useMemo(() => endWallGeometry(), []);
 
   useLayoutEffect(() => {
     const r = rng(5);
@@ -101,143 +111,87 @@ export function Hall({ q, reflections, progress }: { q: Quality; reflections: bo
       mesh?.setMatrixAt(i, dummy.matrix);
     };
 
-    for (let k = 0; k < rowPairs; k++) {
-      for (const s of [-1, 1]) {
-        const { cx, faceDir, faceX, backX } = rowOf(s, k);
-        const yaw = faceDir > 0 ? Math.PI / 2 : -Math.PI / 2;
-        for (let j = 0; j < perRow; j++) {
-          const z = RACK.zStart + j * RACK.pitch;
-          const isTarget = k === 0 && s === -1 && Math.abs(z - TARGET_Z) < 1e-6;
-          dummy.position.set(cx, RACK.height / 2, z);
-          dummy.rotation.set(0, 0, 0);
-          dummy.scale.set(RACK.depth, RACK.height, RACK.width - 0.01);
-          place(bodies.current, n);
-          // Doors: the target rack's front door is off.
-          dummy.position.set(faceX + faceDir * 0.004, RACK.height / 2 + 0.04, z);
+    for (const s of [-1, 1]) {
+      const cx = s * ROW_X;
+      const faceDir = -s; // fronts face the centre aisle
+      const faceX = cx + faceDir * (RACK.depth / 2);
+      const yaw = faceDir > 0 ? Math.PI / 2 : -Math.PI / 2;
+      for (let j = 0; j < perRow; j++) {
+        const z = RACK.zStart + j * RACK.pitch;
+        const isTarget = s === -1 && Math.abs(z - TARGET_Z) < 1e-6;
+        dummy.position.set(cx, RACK.height / 2, z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(RACK.depth, RACK.height, RACK.width - 0.01);
+        place(bodies.current, n);
+        dummy.position.set(faceX + faceDir * 0.004, RACK.height / 2 + 0.04, z);
+        dummy.rotation.set(0, yaw, 0);
+        dummy.scale.set(isTarget ? 0.0001 : RACK.width - 0.04, RACK.height - 0.14, 1);
+        place(fronts.current, n);
+        n++;
+        for (let i = 0; i < ledsPerRack; i++) {
+          const u = 1 + Math.floor((i / ledsPerRack) * 40) + (r() < 0.3 ? 1 : 0);
+          const col = i % 2 ? -0.2 + r() * 0.05 : -0.16 + r() * 0.04;
+          const y = RACK_BASE + u * U + 0.012 + r() * 0.01;
+          dummy.position.set(faceX + faceDir * 0.009, y, z + col * faceDir * -1);
           dummy.rotation.set(0, yaw, 0);
-          dummy.scale.set(isTarget ? 0.0001 : RACK.width - 0.04, RACK.height - 0.14, 1);
-          place(fronts.current, n);
-          dummy.position.set(backX - faceDir * 0.004, RACK.height / 2 + 0.04, z);
-          dummy.rotation.set(0, yaw + Math.PI, 0);
-          dummy.scale.set(RACK.width - 0.04, RACK.height - 0.14, 1);
-          place(rears.current, n);
-          // Top cable manager and a riser bundle up to the tray.
-          dummy.position.set(cx, RACK.height + 0.08, z);
-          dummy.rotation.set(0, 0, 0);
-          dummy.scale.set(0.3, 0.16, 0.25);
-          place(tops.current, n);
-          dummy.position.set(cx + (r() - 0.5) * 0.2, RACK.height + 0.6, z + (r() - 0.5) * 0.1);
-          dummy.rotation.set((r() - 0.5) * 0.1, 0, (r() - 0.5) * 0.1);
-          dummy.scale.set(1, 1, 1);
-          place(risers.current, n);
-          n++;
-
-          // Status LEDs on the equipment behind the front door, aligned to rack units.
-          for (let i = 0; i < ledsPerRack; i++) {
-            const u = 1 + Math.floor((i / ledsPerRack) * 40) + (r() < 0.3 ? 1 : 0);
-            const col = i % 2 ? -0.2 + r() * 0.05 : -0.16 + r() * 0.04;
-            const y = RACK_BASE + u * U + 0.012 + r() * 0.01;
-            dummy.position.set(faceX + faceDir * 0.009, y, z + col * faceDir * -1);
-            dummy.rotation.set(0, yaw, 0);
-            dummy.scale.set(0.0065, 0.0045, 1);
-            place(leds.current, l);
-            phase[l] = r();
-            palette[Math.floor(r() * palette.length)].toArray(tint, l * 3);
-            l++;
-          }
+          dummy.scale.set(0.0065, 0.0045, 1);
+          place(leds.current, l);
+          phase[l] = r();
+          palette[Math.floor(r() * palette.length)].toArray(tint, l * 3);
+          l++;
         }
       }
     }
-    for (const m of [bodies, fronts, rears, tops, risers, leds]) m.current!.instanceMatrix.needsUpdate = true;
-    bodies.current!.count = fronts.current!.count = rears.current!.count = tops.current!.count = risers.current!.count = n;
+    for (const m of [bodies, fronts, leds]) m.current!.instanceMatrix.needsUpdate = true;
+    bodies.current!.count = fronts.current!.count = n;
     leds.current!.count = l;
     const g = leds.current!.geometry;
     g.setAttribute("aPhase", new InstancedBufferAttribute(phase, 1));
     g.setAttribute("aTint", new InstancedBufferAttribute(tint, 3));
 
-    // Overhead: fixtures over every aisle, trays over every row, beams across the hall.
+    // Fixtures down the centre of the aisle.
     let f = 0;
-    const aisleXs: number[] = [0];
-    for (let k = 1; k < rowPairs; k++) for (const s of [-1, 1]) aisleXs.push(s * (ROW_X + (k - 0.5) * ROW_PITCH));
-    for (const x of aisleXs) {
-      for (let z = RACK.zStart - 1; z <= RACK.zEnd + 1; z += 3) {
-        dummy.position.set(x, HALL_CEILING - 0.12, z);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.set(0.1, 0.03, 1.5);
-        place(fixtures.current, f);
-        dummy.position.set(x, HALL_CEILING - 0.09, z);
-        dummy.scale.set(0.18, 0.08, 1.6);
-        place(housings.current, f);
-        f++;
-      }
+    for (let z = RACK.zStart - 0.3; z <= RACK.zEnd + 0.6; z += 2.4) {
+      dummy.position.set(0, CEIL - 0.1, z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(0.1, 0.03, 1.5);
+      place(fixtures.current, f);
+      dummy.position.set(0, CEIL - 0.07, z);
+      dummy.scale.set(0.18, 0.08, 1.6);
+      place(housings.current, f);
+      f++;
     }
     fixtures.current!.count = housings.current!.count = f;
     fixtures.current!.instanceMatrix.needsUpdate = true;
     housings.current!.instanceMatrix.needsUpdate = true;
 
-    let rg = 0, rl = 0, bd = 0, tp = 0;
-    for (let k = 0; k < rowPairs; k++) for (const s of [-1, 1]) {
-      const { cx } = rowOf(s, k);
+    // Ladder trays above each rack front, with cable bundles.
+    let rg = 0, rl = 0, bd = 0;
+    for (const s of [-1, 1]) {
+      const cx = s * 0.85;
       for (const dx of [-0.2, 0.2]) {
-        dummy.position.set(cx + dx, 3.1, ROW_MID);
+        dummy.position.set(cx + dx, 2.85, ROW_MID);
         dummy.rotation.set(0, 0, 0);
         dummy.scale.set(0.04, 0.1, ROW_LEN);
         place(rails.current, rl++);
       }
       for (let z = RACK.zStart; z <= RACK.zEnd; z += 0.3) {
-        dummy.position.set(cx, 3.06, z);
+        dummy.position.set(cx, 2.81, z);
         dummy.scale.set(0.4, 0.03, 0.03);
         place(rungs.current, rg++);
       }
       for (let b = 0; b < 3; b++) {
-        dummy.position.set(cx - 0.12 + b * 0.12, 3.12, ROW_MID);
+        dummy.position.set(cx - 0.12 + b * 0.12, 2.87, ROW_MID);
         dummy.rotation.set(Math.PI / 2, 0, 0);
         dummy.scale.set(1, ROW_LEN, 1);
         place(bundles.current, bd++);
-      }
-      // Busway tap-off boxes every four racks.
-      for (let z = RACK.zStart + 1; z <= RACK.zEnd; z += 2.4) {
-        dummy.position.set(cx, 3.5, z);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.set(0.22, 0.18, 0.3);
-        place(taps.current, tp++);
       }
     }
     rails.current!.count = rl;
     rungs.current!.count = rg;
     bundles.current!.count = bd;
-    taps.current!.count = tp;
-    for (const m of [rails, rungs, bundles, taps]) m.current!.instanceMatrix.needsUpdate = true;
-
-    let bm = 0;
-    for (let z = -INNER_D / 2 + 3; z < INNER_D / 2; z += 6) {
-      dummy.position.set(0, HALL_CEILING - 0.25, z);
-      dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(INNER_W, 0.5, 0.3);
-      place(beams.current, bm++);
-    }
-    beams.current!.count = bm;
-    beams.current!.instanceMatrix.needsUpdate = true;
-
-    // Containment door frames at the ends of each hot aisle.
-    let df = 0;
-    for (let k = 0; k + 1 < rowPairs; k += 2) for (const s of [-1, 1]) {
-      const x = s * (ROW_X + (k + 0.5) * ROW_PITCH);
-      for (const z of [RACK.zStart - 0.45, RACK.zEnd + 0.45]) {
-        for (const dx of [-AISLE_W / 2, 0, AISLE_W / 2]) {
-          dummy.position.set(x + dx, RACK.height / 2, z);
-          dummy.rotation.set(0, 0, 0);
-          dummy.scale.set(0.06, RACK.height, 0.06);
-          place(doorFrames.current, df++);
-        }
-        dummy.position.set(x, RACK.height, z);
-        dummy.scale.set(AISLE_W, 0.06, 0.06);
-        place(doorFrames.current, df++);
-      }
-    }
-    doorFrames.current!.count = df;
-    doorFrames.current!.instanceMatrix.needsUpdate = true;
-  }, [rackCount, ledsPerRack, perRow, rowPairs]);
+    for (const m of [rails, rungs, bundles]) m.current!.instanceMatrix.needsUpdate = true;
+  }, [rackCount, ledsPerRack, perRow]);
 
   // Dust motes drifting in the aisle light near the open rack.
   const moteGeom = useMemo(() => {
@@ -278,14 +232,13 @@ export function Hall({ q, reflections, progress }: { q: Quality; reflections: bo
     }
   });
 
-  const hotAisles: number[] = [];
-  for (let k = 0; k + 1 < rowPairs; k += 2) for (const s of [-1, 1]) hotAisles.push(s * (ROW_X + (k + 0.5) * ROW_PITCH));
+  const SPINE_Z = -INNER_L / 2 - 1.6;
 
   return (
-    <group ref={group} visible={false}>
+    <group ref={group} visible={false} position={[0, FLOOR_Y, 0]}>
       {/* Floor: semi-gloss tiles (reflective on desktop) with perforated tiles in front of the racks. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, 0, 0]}>
-        <planeGeometry args={[INNER_W, INNER_D]} />
+        <planeGeometry args={[INNER_W, INNER_L]} />
         {reflections ? (
           <MeshReflectorMaterial
             map={tex.floor.map}
@@ -315,122 +268,75 @@ export function Hall({ q, reflections, progress }: { q: Quality; reflections: bo
         </mesh>
       ))}
 
-      {/* Walls and ceiling, seen from inside. */}
-      <mesh position={[0, HALL_CEILING / 2, -INNER_D / 2]} material={tex.wallLong}>
-        <planeGeometry args={[INNER_W, HALL_CEILING]} />
-      </mesh>
-      {/* Front wall of the hall, with the double doorway the camera comes through. */}
+      {/* Walls, ceiling and the two end walls with doorways. */}
       {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * (INNER_W / 4 + HALL_DOOR.w / 4), HALL_CEILING / 2, LOBBY.z0]} rotation-y={Math.PI} material={tex.wallLong}>
-          <planeGeometry args={[INNER_W / 2 - HALL_DOOR.w / 2, HALL_CEILING]} />
+        <mesh key={s} position={[s * (INNER_W / 2), CEIL / 2, 0]} rotation-y={(-s * Math.PI) / 2} material={tex.wallLong}>
+          <planeGeometry args={[INNER_L, CEIL]} />
         </mesh>
       ))}
-      <mesh position={[0, (HALL_CEILING + HALL_DOOR.h) / 2, LOBBY.z0]} rotation-y={Math.PI} material={tex.wallLong}>
-        <planeGeometry args={[HALL_DOOR.w, HALL_CEILING - HALL_DOOR.h]} />
+      <mesh position={[0, CEIL, 0]} rotation-x={Math.PI / 2} material={tex.ceiling}>
+        <planeGeometry args={[INNER_W, INNER_L]} />
       </mesh>
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * (HALL_DOOR.w / 2 + 0.04), HALL_DOOR.h / 2, LOBBY.z0]} material={tex.steel}>
-          <boxGeometry args={[0.08, HALL_DOOR.h, 0.2]} />
-        </mesh>
-      ))}
-      <mesh position={[0, HALL_DOOR.h + 0.04, LOBBY.z0]} material={tex.steel}>
-        <boxGeometry args={[HALL_DOOR.w + 0.16, 0.08, 0.2]} />
+      <mesh position={[0, 0, -INNER_L / 2]} geometry={endGeom} material={tex.wallEnd} />
+      <mesh position={[0, 0, INNER_L / 2]} rotation-y={Math.PI} geometry={endGeom} material={tex.wallEnd} />
+      {[-INNER_L / 2, INNER_L / 2].map((z) =>
+        [[-DOOR.w / 2 - 0.04, DOOR.h / 2, 0.08, DOOR.h], [DOOR.w / 2 + 0.04, DOOR.h / 2, 0.08, DOOR.h], [0, DOOR.h + 0.04, DOOR.w + 0.16, 0.08]].map(([x, y, sx, sy], i) => (
+          <mesh key={`${z}${i}`} position={[x, y, z]} material={tex.steel}>
+            <boxGeometry args={[sx, sy, 0.2]} />
+          </mesh>
+        )),
+      )}
+      {/* Spine corridor beyond the far door: a lit stub so the doorway glows. */}
+      <mesh position={[0, 1.4, SPINE_Z]} material={tex.spine}>
+        <boxGeometry args={[3.0, 2.8, 3.1]} />
       </mesh>
+      <mesh position={[0, 2.76, SPINE_Z]} material={tex.fixture}>
+        <boxGeometry args={[0.1, 0.03, 2.4]} />
+      </mesh>
+      <pointLight position={[0, 2.4, SPINE_Z]} color="#e6edf8" intensity={6} distance={7} decay={2} />
 
-      {/* Lobby between the glass doors and the hall: side walls, low ceiling with a fixture, a reception desk. */}
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * LOBBY.halfW, LOBBY.h / 2, (LOBBY.z0 + LOBBY.z1) / 2]} rotation-y={(-s * Math.PI) / 2} material={tex.wallShort}>
-          <planeGeometry args={[LOBBY.z1 - LOBBY.z0, LOBBY.h]} />
-        </mesh>
-      ))}
-      <mesh position={[0, LOBBY.h, (LOBBY.z0 + LOBBY.z1) / 2]} rotation-x={Math.PI / 2} material={tex.ceiling}>
-        <planeGeometry args={[LOBBY.halfW * 2, LOBBY.z1 - LOBBY.z0]} />
-      </mesh>
-      <mesh position={[0, LOBBY.h - 0.03, (LOBBY.z0 + LOBBY.z1) / 2]} material={tex.fixture}>
-        <boxGeometry args={[2.4, 0.04, 0.3]} />
-      </mesh>
-      <mesh position={[2.6, 0.55, LOBBY.z0 + 1.2]} material={tex.darkSteel}>
-        <boxGeometry args={[2.4, 1.1, 0.7]} />
-      </mesh>
-      <pointLight position={[0, LOBBY.h - 0.3, (LOBBY.z0 + LOBBY.z1) / 2]} color="#e6edf8" intensity={9} distance={9} decay={2} />
-      <mesh position={[-INNER_W / 2, HALL_CEILING / 2, 0]} rotation-y={Math.PI / 2} material={tex.wallShort}>
-        <planeGeometry args={[INNER_D, HALL_CEILING]} />
-      </mesh>
-      <mesh position={[INNER_W / 2, HALL_CEILING / 2, 0]} rotation-y={-Math.PI / 2} material={tex.wallShort}>
-        <planeGeometry args={[INNER_D, HALL_CEILING]} />
-      </mesh>
-      <mesh position={[0, HALL_CEILING, 0]} rotation-x={Math.PI / 2} material={tex.ceiling}>
-        <planeGeometry args={[INNER_W, INNER_D]} />
-      </mesh>
-      <instancedMesh ref={beams} args={[undefined, undefined, 8]} material={tex.darkSteel}>
-        <boxGeometry />
-      </instancedMesh>
-
-      {/* Racks */}
+      {/* Racks and chimney containment from rack top to ceiling. */}
       <instancedMesh ref={bodies} args={[undefined, undefined, rackCount]} material={tex.graphite}>
         <boxGeometry />
       </instancedMesh>
       <instancedMesh ref={fronts} args={[undefined, undefined, rackCount]} material={tex.door}>
         <planeGeometry />
       </instancedMesh>
-      <instancedMesh ref={rears} args={[undefined, undefined, rackCount]} material={tex.rearDoor}>
-        <planeGeometry />
-      </instancedMesh>
-      <instancedMesh ref={tops} args={[undefined, undefined, rackCount]} material={tex.darkSteel}>
-        <boxGeometry />
-      </instancedMesh>
-      <instancedMesh ref={risers} args={[undefined, undefined, rackCount]} material={tex.cable}>
-        <cylinderGeometry args={[0.028, 0.028, 0.95, 6]} />
-      </instancedMesh>
       <instancedMesh ref={leds} args={[undefined, undefined, rackCount * ledsPerRack]} material={ledMat}>
         <planeGeometry />
       </instancedMesh>
-
-      {/* Hot-aisle containment: polycarbonate roofs and end doors with aluminium frames. */}
-      {hotAisles.map((x) => (
-        <group key={x}>
-          <mesh position={[x, RACK.height + 0.03, ROW_MID]} rotation-x={-Math.PI / 2} material={tex.poly}>
-            <planeGeometry args={[AISLE_W, ROW_LEN + 0.9]} />
-          </mesh>
-          {[RACK.zStart - 0.45, RACK.zEnd + 0.45].map((z) => (
-            <mesh key={z} position={[x, RACK.height / 2, z]} material={tex.poly}>
-              <planeGeometry args={[AISLE_W, RACK.height]} />
-            </mesh>
-          ))}
-        </group>
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * -RACK_FRONT_X, (RACK.height + CEIL) / 2, ROW_MID]} rotation-y={(s * Math.PI) / 2} material={tex.panel}>
+          <planeGeometry args={[ROW_LEN + 0.6, CEIL - RACK.height]} />
+        </mesh>
       ))}
-      <instancedMesh ref={doorFrames} args={[undefined, undefined, 64]} material={tex.steel}>
-        <boxGeometry />
-      </instancedMesh>
 
-      {/* Overhead infrastructure: ladder trays with cable bundles, busway tap boxes, light fixtures. */}
-      <instancedMesh ref={rails} args={[undefined, undefined, rowPairs * 4]} material={tex.steel}>
+      {/* Overhead: ladder trays with cable bundles, light fixtures, a sprinkler main. */}
+      <instancedMesh ref={rails} args={[undefined, undefined, 4]} material={tex.steel}>
         <boxGeometry />
       </instancedMesh>
-      <instancedMesh ref={rungs} args={[undefined, undefined, rowPairs * 2 * 110]} material={tex.steel}>
+      <instancedMesh ref={rungs} args={[undefined, undefined, 120]} material={tex.steel}>
         <boxGeometry />
       </instancedMesh>
-      <instancedMesh ref={bundles} args={[undefined, undefined, rowPairs * 6]} material={tex.cable}>
+      <instancedMesh ref={bundles} args={[undefined, undefined, 6]} material={tex.cable}>
         <cylinderGeometry args={[0.035, 0.035, 1, 6]} />
       </instancedMesh>
-      <instancedMesh ref={taps} args={[undefined, undefined, rowPairs * 2 * 14]} material={tex.darkSteel}>
+      <instancedMesh ref={housings} args={[undefined, undefined, 12]} material={tex.darkSteel}>
         <boxGeometry />
       </instancedMesh>
-      <instancedMesh ref={housings} args={[undefined, undefined, rowPairs * 2 * 12]} material={tex.darkSteel}>
+      <instancedMesh ref={fixtures} args={[undefined, undefined, 12]} material={tex.fixture}>
         <boxGeometry />
       </instancedMesh>
-      <instancedMesh ref={fixtures} args={[undefined, undefined, rowPairs * 2 * 12]} material={tex.fixture}>
-        <boxGeometry />
-      </instancedMesh>
+      <mesh position={[0.45, CEIL - 0.18, 0]} rotation-x={Math.PI / 2} material={tex.steel}>
+        <cylinderGeometry args={[0.03, 0.03, INNER_L - 0.4, 8]} />
+      </mesh>
 
-      {/* Lighting: cool-white downlights along the centre aisle, a little ambient from the walls. */}
+      {/* Lighting: cool-white downlights along the aisle, a little ambient from the walls. */}
       <hemisphereLight args={["#2a3550", "#0a0c10", 0.35]} />
       {Array.from({ length: q.aisleLights }, (_, i) => {
-        const z = RACK.zStart - 1 + ((RACK.zEnd - RACK.zStart + 2) * i) / Math.max(1, q.aisleLights - 1);
-        return <pointLight key={i} position={[0, HALL_CEILING - 0.4, z]} color="#d6e4ff" intensity={22} distance={16} decay={2} />;
+        const z = RACK.zStart - 0.5 + ((RACK.zEnd - RACK.zStart + 1) * i) / Math.max(1, q.aisleLights - 1);
+        return <pointLight key={i} position={[0, CEIL - 0.35, z]} color="#d6e4ff" intensity={14} distance={12} decay={2} />;
       })}
-      {!q.mobile && <pointLight position={[-(ROW_X + 1.5 * ROW_PITCH), HALL_CEILING - 0.4, 0]} color="#d6e4ff" intensity={20} distance={14} decay={2} />}
-      {!q.mobile && <pointLight position={[ROW_X + 1.5 * ROW_PITCH, HALL_CEILING - 0.4, 0]} color="#d6e4ff" intensity={20} distance={14} decay={2} />}
 
       <points ref={motes} geometry={moteGeom} frustumCulled={false}>
         <pointsMaterial map={tex.dot} color="#9fc4ff" size={0.0025} sizeAttenuation transparent opacity={0} depthWrite={false} blending={AdditiveBlending} />

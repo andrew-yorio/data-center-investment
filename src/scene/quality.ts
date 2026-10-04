@@ -16,8 +16,6 @@ export interface Quality {
   smaa: boolean;
   /** Maximum device pixel ratio. */
   maxDpr: number;
-  /** Rack rows per side of the hall. */
-  rowPairs: number;
   /** Status LEDs per rack. */
   ledsPerRack: number;
   /** Side length of the die texture. */
@@ -41,7 +39,6 @@ export function quality(mobile: boolean, degraded: boolean): Quality {
       dof: false,
       smaa: false,
       maxDpr: degraded ? 1 : 1.5,
-      rowPairs: 3,
       ledsPerRack: 10,
       dieRes: 1024,
       aisleLights: 3,
@@ -57,7 +54,6 @@ export function quality(mobile: boolean, degraded: boolean): Quality {
     dof: !degraded,
     smaa: true,
     maxDpr: degraded ? 1.25 : 1.75,
-    rowPairs: 6,
     ledsPerRack: 22,
     dieRes: 2048,
     aisleLights: 7,

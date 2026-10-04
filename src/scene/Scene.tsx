@@ -84,7 +84,7 @@ function CameraRig({ onBeat }: { onBeat: (macro: boolean) => void }) {
     pos.y += Math.sin(state.clock.elapsedTime * 0.09) * 0.8 * idle;
     // Opening shot: keep the building clear of the headline (right on wide screens, above it on tall ones).
     const compose = 1 - ramp(p, 0.02, 0.13);
-    if (size.width >= size.height) frameOffset.set(-30, 2, 14);
+    if (size.width >= size.height) frameOffset.set(-26, 1, 10);
     else frameOffset.set(0, -16, 0);
     target.addScaledVector(frameOffset, compose);
     camera.position.copy(pos);
@@ -133,7 +133,7 @@ export default function Scene({ mobile, active }: { mobile: boolean; active: boo
       dpr={dpr}
       shadows={q.shadows ? "percentage" : false}
       gl={{ antialias: false, powerPreference: "high-performance", stencil: false, toneMappingExposure: 1.0 }}
-      camera={{ fov: mobile ? 55 : 42, position: [62, 24, 96], near: 0.1, far: 2000 }}
+      camera={{ fov: mobile ? 55 : 42, position: [52, 17, 78], near: 0.1, far: 2000 }}
     >
       <PerformanceMonitor
         ms={250}

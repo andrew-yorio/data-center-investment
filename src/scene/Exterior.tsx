@@ -2,9 +2,9 @@ import { MeshReflectorMaterial, Stars } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { AdditiveBlending, Color, type DirectionalLight, DoubleSide, type Group, type InstancedMesh, MeshStandardMaterial, Object3D, Path, Shape, ShapeGeometry, type Texture } from "three";
-import { ANNEX, BUILDING, DOOR, ramp } from "./path";
+import { DOOR, MODULE, SPINE, ramp } from "./path";
 import type { Quality } from "./quality";
-import { chainlinkTexture, facadeMaps, glowTexture, louvreMaps, type MapSet, officeGlassTexture, paintedMetalMaps, pavementMaps, roofMaps } from "./textures";
+import { chainlinkTexture, corrugatedMaps, glowTexture, louvreMaps, type MapSet, officeGlassTexture, paintedMetalMaps, pavementMaps, roofMaps } from "./textures";
 import { lightConeMaterial, skyMaterial } from "./materials";
 
 const dummy = new Object3D();
@@ -33,62 +33,40 @@ function pbr(set: MapSet, extra: Partial<MeshStandardMaterial> = {}): MeshStanda
   return m;
 }
 
-const { w: W, h: H, d: D } = BUILDING;
+const { w: MW, h: MH, len: ML, pitch: MP, count: MC, base: MB } = MODULE;
 const LAMP = new Color("#dfeaff").multiplyScalar(7); // HDR: blooms
 const MOON = "#9fb4e6";
+const FAR_ROW_Z = SPINE.z - SPINE.w / 2 - ML / 2 - 0.6; // centre of the second row of modules, beyond the spine
+const SPINE_LEN = MP * MC + 2;
+const LOT_Z = 20; // front parking lot
+const ROAD_Z = 36;
 
 /** Light poles: along the front lot and the access road. */
 const POLES: [number, number][] = [];
-for (let i = 0; i < 6; i++) POLES.push([-34 + i * 13.6, D / 2 + 14]);
-for (let i = 0; i < 4; i++) POLES.push([-26 + i * 17, D / 2 + 31]);
+for (let i = 0; i < 6; i++) POLES.push([-30 + i * 12, LOT_Z + 6]);
+for (let i = 0; i < 4; i++) POLES.push([-24 + i * 16, ROAD_Z - 5]);
 
-export function Exterior({ q, reflections, progress }: { q: Quality; reflections: boolean; progress: { p: number } }) {
-  const group = useRef<Group>(null);
-  const moon = useRef<DirectionalLight>(null);
-  const fanBlades = useRef<InstancedMesh>(null);
-  const stripes = useRef<InstancedMesh>(null);
-  const roadDashes = useRef<InstancedMesh>(null);
-  const fencePosts = useRef<InstancedMesh>(null);
-  const louvres = useRef<InstancedMesh>(null);
-  const cones = useRef<InstancedMesh>(null);
-  const pools = useRef<InstancedMesh>(null);
-  const heads = useRef<InstancedMesh>(null);
-  const polesMesh = useRef<InstancedMesh>(null);
-  const shrouds = useRef<InstancedMesh>(null);
-  const grilles = useRef<InstancedMesh>(null);
+/** Module centres: the near row faces the lot (doors toward +z); the far row mirrors it beyond the spine. */
+const MODULES: { x: number; z: number; far: boolean }[] = [];
+for (let i = 0; i < MC; i++) {
+  const x = (i - (MC - 1) / 2) * MP;
+  MODULES.push({ x, z: 0, far: false });
+  MODULES.push({ x, z: FAR_ROW_Z, far: true });
+}
+const CAMERA_MODULE = MODULES.findIndex((m) => Math.abs(m.x) < 1e-6 && !m.far);
+const UNIT_Z = [-4.5, 2.5]; // rooftop cooling units along each module
 
-  const tex = useMemo(() => {
-    const facade = facadeMaps(512);
-    const concrete = pavementMaps("concrete", 512);
-    const asphalt = pavementMaps("asphalt", 512);
-    const louvre = louvreMaps(256);
-    const steel = paintedMetalMaps("#7d838b", 256);
-    const roof = roofMaps(256);
-    return {
-      facadeFront: pbr(tiled(facade, W / 6, H / 7)),
-      // The front facade is a shape with the door opening cut out; ShapeGeometry UVs are in metres.
-      facadeFrontCut: pbr(tiled(facade, 1 / 6, 1 / 7)),
-      facadeSide: pbr(tiled(facade, D / 6, H / 7)),
-      roof: pbr(tiled(roof, W / 2, D / 2)),
-      concrete: tiled(concrete, 150 / 14, 110 / 14),
-      asphaltFar: pbr(tiled(asphalt, 200, 200), { color: new Color("#3a3d42") }),
-      road: pbr(tiled(asphalt, 40, 1), { color: new Color("#4a4d52") }),
-      louvre: pbr(tiled(louvre, 1, 1)),
-      louvreWide: pbr(tiled(louvre, 2.5, 1)),
-      steel: pbr(tiled(steel, 1, 1)),
-      steelDark: pbr(tiled(steel, 1, 1), { color: new Color("#4a5059") }),
-      office: officeGlassTexture(512),
-      chainlink: chainlinkTexture(128),
-      glow: glowTexture(256, 1.8),
-    };
-  }, []);
+type Materials = ReturnType<typeof useExteriorMaterials>;
 
-  const frontGeom = useMemo(() => {
+/** A prefabricated data-hall module on a plinth: corrugated walls, roof plant, end door with a lamp. */
+function Module({ x, z, far, open, tex }: { x: number; z: number; far: boolean; open: boolean; tex: Materials }) {
+  const endGeom = useMemo(() => {
+    if (!open) return null;
     const shape = new Shape();
-    shape.moveTo(-W / 2, 0);
-    shape.lineTo(W / 2, 0);
-    shape.lineTo(W / 2, H);
-    shape.lineTo(-W / 2, H);
+    shape.moveTo(-MW / 2, 0);
+    shape.lineTo(MW / 2, 0);
+    shape.lineTo(MW / 2, MH);
+    shape.lineTo(-MW / 2, MH);
     shape.closePath();
     const hole = new Path();
     hole.moveTo(-DOOR.w / 2, 0);
@@ -98,42 +76,148 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
     hole.closePath();
     shape.holes.push(hole);
     return new ShapeGeometry(shape);
-  }, []);
+  }, [open]);
+  return (
+    <group position={[x, 0, z]} rotation-y={far ? Math.PI : 0}>
+      {/* Plinth */}
+      <mesh position={[0, MB / 2, 0]} material={tex.steelDark} castShadow>
+        <boxGeometry args={[MW + 0.3, MB, ML + 0.3]} />
+      </mesh>
+      {/* Walls */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (MW / 2), MB + MH / 2, 0]} rotation-y={(s * Math.PI) / 2} material={tex.cladLong} castShadow receiveShadow>
+          <planeGeometry args={[ML, MH]} />
+        </mesh>
+      ))}
+      <mesh position={[0, MB + MH / 2, -ML / 2]} rotation-y={Math.PI} material={tex.cladEnd} castShadow receiveShadow>
+        <planeGeometry args={[MW, MH]} />
+      </mesh>
+      {open && endGeom ? (
+        <mesh position={[0, MB, ML / 2]} geometry={endGeom} material={tex.cladEndCut} castShadow receiveShadow />
+      ) : (
+        <mesh position={[0, MB + MH / 2, ML / 2]} material={tex.cladEnd} castShadow receiveShadow>
+          <planeGeometry args={[MW, MH]} />
+        </mesh>
+      )}
+      {/* Door: closed panel, or swung open against the wall */}
+      <mesh
+        position={open ? [DOOR.w / 2 + 0.03, MB + DOOR.h / 2, ML / 2 + DOOR.w / 2] : [0, MB + DOOR.h / 2, ML / 2 + 0.03]}
+        rotation-y={open ? Math.PI / 2 : 0}
+        material={tex.door}
+      >
+        <boxGeometry args={[DOOR.w, DOOR.h, 0.06]} />
+      </mesh>
+      {/* Steps and door lamp */}
+      <mesh position={[0, MB / 2 - 0.09, ML / 2 + 0.55]} material={tex.steel}>
+        <boxGeometry args={[DOOR.w + 0.6, MB - 0.18, 0.8]} />
+      </mesh>
+      <mesh position={[0, MB + DOOR.h + 0.35, ML / 2 + 0.12]} material={tex.lamp}>
+        <boxGeometry args={[0.45, 0.14, 0.24]} />
+      </mesh>
+      {/* Roof with edge trim and two cooling units */}
+      <mesh position={[0, MB + MH, 0]} rotation-x={-Math.PI / 2} material={tex.roof} receiveShadow>
+        <planeGeometry args={[MW, ML]} />
+      </mesh>
+      {[[0, ML / 2, MW + 0.1, 0.12], [0, -ML / 2, MW + 0.1, 0.12], [MW / 2, 0, 0.12, ML], [-MW / 2, 0, 0.12, ML]].map(([ex, ez, sx, sz], i) => (
+        <mesh key={i} position={[ex, MB + MH + 0.08, ez]} material={tex.steelDark}>
+          <boxGeometry args={[sx, 0.18, sz]} />
+        </mesh>
+      ))}
+      {UNIT_Z.map((uz) => (
+        <group key={uz} position={[0, MB + MH + 0.75, uz]}>
+          <mesh material={tex.steel} castShadow>
+            <boxGeometry args={[2.6, 1.3, 2.3]} />
+          </mesh>
+          <mesh position={[1.31, 0, 0]} rotation-y={Math.PI / 2} material={tex.louvre}>
+            <planeGeometry args={[2, 1]} />
+          </mesh>
+          <mesh position={[-1.31, 0, 0]} rotation-y={-Math.PI / 2} material={tex.louvre}>
+            <planeGeometry args={[2, 1]} />
+          </mesh>
+        </group>
+      ))}
+      {/* Conduit along one eave */}
+      <mesh position={[MW / 2 + 0.12, MB + MH - 0.4, 0]} material={tex.steelDark}>
+        <boxGeometry args={[0.18, 0.18, ML]} />
+      </mesh>
+    </group>
+  );
+}
 
-  // Chillers: 3 rows x 5 units on the roof, each with 4 fans.
-  const chillers = useMemo(() => {
-    const out: [number, number][] = [];
-    for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) out.push([-24 + c * 12, -11 + r * 11]);
-    return out;
+function useExteriorMaterials() {
+  return useMemo(() => {
+    const clad = corrugatedMaps("#c4c8cd", 512);
+    const concrete = pavementMaps("concrete", 512);
+    const asphalt = pavementMaps("asphalt", 512);
+    const louvre = louvreMaps(256);
+    const steel = paintedMetalMaps("#7d838b", 256);
+    const roof = roofMaps(256);
+    return {
+      cladLong: pbr(tiled(clad, ML / 3, MH / 3)),
+      cladEnd: pbr(tiled(clad, MW / 3, MH / 3)),
+      // The open end wall is a shape with the door cut out; ShapeGeometry UVs are in metres.
+      cladEndCut: pbr(tiled(clad, 1 / 3, 1 / 3)),
+      cladSpine: pbr(tiled(clad, SPINE_LEN / 3, SPINE.h / 3)),
+      cladDark: pbr(tiled(corrugatedMaps("#4b5058", 256), 12 / 3, 1)),
+      roof: pbr(tiled(roof, MW / 2, ML / 2)),
+      concrete: tiled(concrete, 130 / 14, 100 / 14),
+      asphaltFar: pbr(tiled(asphalt, 200, 200), { color: new Color("#3a3d42") }),
+      road: pbr(tiled(asphalt, 40, 1), { color: new Color("#4a4d52") }),
+      louvre: pbr(tiled(louvre, 1, 1)),
+      steel: pbr(tiled(steel, 1, 1)),
+      steelDark: pbr(tiled(steel, 1, 1), { color: new Color("#4a5059") }),
+      door: new MeshStandardMaterial({ color: "#2b3038", roughness: 0.5, metalness: 0.6 }),
+      lamp: new MeshStandardMaterial({ color: "#20242a", emissive: LAMP, emissiveIntensity: 0.6, roughness: 0.5, metalness: 0.4 }),
+      office: officeGlassTexture(512),
+      chainlink: chainlinkTexture(128),
+      glow: glowTexture(256, 1.8),
+    };
   }, []);
+}
+
+export function Exterior({ q, reflections, progress }: { q: Quality; reflections: boolean; progress: { p: number } }) {
+  const group = useRef<Group>(null);
+  const moon = useRef<DirectionalLight>(null);
+  const fanBlades = useRef<InstancedMesh>(null);
+  const shrouds = useRef<InstancedMesh>(null);
+  const grilles = useRef<InstancedMesh>(null);
+  const stripes = useRef<InstancedMesh>(null);
+  const roadDashes = useRef<InstancedMesh>(null);
+  const fencePosts = useRef<InstancedMesh>(null);
+  const cones = useRef<InstancedMesh>(null);
+  const pools = useRef<InstancedMesh>(null);
+  const heads = useRef<InstancedMesh>(null);
+  const polesMesh = useRef<InstancedMesh>(null);
+  const tex = useExteriorMaterials();
+
+  // Two fans on each rooftop cooling unit, two units per module.
   const fanSlots = useMemo(() => {
     const out: [number, number][] = [];
-    for (const [x, z] of chillers) for (let i = 0; i < 4; i++) out.push([x - 2.7 + i * 1.8, z]);
+    for (const m of MODULES) for (const uz of UNIT_Z) for (const fx of [-0.65, 0.65]) out.push([m.x + fx, m.z + (m.far ? -uz : uz)]);
     return out;
-  }, [chillers]);
+  }, []);
+  const FAN_Y = MB + MH + 1.4;
 
   useLayoutEffect(() => {
     const set = (mesh: InstancedMesh | null, i: number) => {
       dummy.updateMatrix();
       mesh?.setMatrixAt(i, dummy.matrix);
     };
-    // Fan shrouds, grilles, blades.
     fanSlots.forEach(([x, z], i) => {
-      dummy.position.set(x, H + 2.4 + 0.18, z);
+      dummy.position.set(x, FAN_Y + 0.12, z);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(1, 1, 1);
       set(shrouds.current, i);
-      dummy.position.set(x, H + 2.4 + 0.37, z);
+      dummy.position.set(x, FAN_Y + 0.25, z);
       dummy.rotation.set(-Math.PI / 2, 0, 0);
       set(grilles.current, i);
     });
     shrouds.current!.instanceMatrix.needsUpdate = true;
     grilles.current!.instanceMatrix.needsUpdate = true;
 
-    // Parking stripes: two rows of bays in the front lot.
     let n = 0;
-    for (const z0 of [D / 2 + 8, D / 2 + 19]) {
-      for (let x = -33; x <= 33; x += 2.75) {
+    for (const z0 of [LOT_Z, LOT_Z + 11]) {
+      for (let x = -30; x <= 30; x += 2.75) {
         dummy.position.set(x, 0.02, z0 + 2.5);
         dummy.rotation.set(-Math.PI / 2, 0, 0);
         dummy.scale.set(0.12, 5, 1);
@@ -143,10 +227,9 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
     stripes.current!.count = n;
     stripes.current!.instanceMatrix.needsUpdate = true;
 
-    // Road center dashes.
     n = 0;
     for (let x = -150; x < 150; x += 6) {
-      dummy.position.set(x, 0.02, D / 2 + 27);
+      dummy.position.set(x, 0.02, ROAD_Z);
       dummy.rotation.set(-Math.PI / 2, 0, 0);
       dummy.scale.set(2.2, 0.15, 1);
       set(roadDashes.current, n++);
@@ -154,9 +237,8 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
     roadDashes.current!.count = n;
     roadDashes.current!.instanceMatrix.needsUpdate = true;
 
-    // Perimeter fence posts.
     n = 0;
-    const fx = 74, fz0 = -50, fz1 = D / 2 + 36;
+    const fx = 60, fz0 = -44, fz1 = ROAD_Z - 4;
     const post = (x: number, z: number) => {
       dummy.position.set(x, 1.2, z);
       dummy.rotation.set(0, 0, 0);
@@ -168,24 +250,6 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
     fencePosts.current!.count = n;
     fencePosts.current!.instanceMatrix.needsUpdate = true;
 
-    // Intake louvres low on the side and back walls.
-    n = 0;
-    for (const side of [-1, 1]) for (let z = -D / 2 + 4; z < D / 2 - 3; z += 6) {
-      dummy.position.set(side * (W / 2 + 0.06), 3, z);
-      dummy.rotation.set(0, (side * Math.PI) / 2, 0);
-      dummy.scale.set(3.6, 3, 1);
-      set(louvres.current, n++);
-    }
-    for (let x = -W / 2 + 4; x < W / 2 - 3; x += 6) {
-      dummy.position.set(x, 3, -D / 2 - 0.06);
-      dummy.rotation.set(0, Math.PI, 0);
-      dummy.scale.set(3.6, 3, 1);
-      set(louvres.current, n++);
-    }
-    louvres.current!.count = n;
-    louvres.current!.instanceMatrix.needsUpdate = true;
-
-    // Poles, heads, cones and ground pools.
     POLES.forEach(([x, z], i) => {
       dummy.position.set(x, 4.5, z);
       dummy.rotation.set(0, 0, 0);
@@ -194,28 +258,26 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
       dummy.position.set(x, 9.05, z - 0.9);
       set(heads.current, i);
       dummy.position.set(x, 4.6, z - 0.9);
-      dummy.scale.set(1, 1, 1);
       set(cones.current, i);
       dummy.position.set(x, 0.03, z - 0.9);
       dummy.rotation.set(-Math.PI / 2, 0, 0);
       set(pools.current, i);
     });
     for (const m of [polesMesh, heads, cones, pools]) m.current!.instanceMatrix.needsUpdate = true;
-  }, [fanSlots]);
+  }, [fanSlots, FAN_Y]);
 
   useFrame((state) => {
-    const p = state.clock.elapsedTime;
+    const t = state.clock.elapsedTime;
     const g = group.current;
     if (!g) return;
-    // Visible while the camera is outside the building; the moon fades before the hall takes over.
-    g.visible = progress.p < 0.235;
+    // Visible while the camera is outside the module; the moon fades before the interior takes over.
+    g.visible = progress.p < 0.245;
     if (!g.visible) return;
-    if (moon.current) moon.current.intensity = 0.55 * (1 - ramp(progress.p, 0.17, 0.23));
-    // Chiller fans turn slowly; from this distance only the motion reads.
+    if (moon.current) moon.current.intensity = 0.55 * (1 - ramp(progress.p, 0.17, 0.24));
     if (fanBlades.current) {
       fanSlots.forEach(([x, z], i) => {
-        dummy.position.set(x, H + 2.4 + 0.28, z);
-        dummy.rotation.set(0, p * 2.2 + i * 1.7, 0);
+        dummy.position.set(x, FAN_Y + 0.18, z);
+        dummy.rotation.set(0, t * 2.6 + i * 1.7, 0);
         dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
         fanBlades.current!.setMatrixAt(i, dummy.matrix);
@@ -227,6 +289,8 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
   const coneMat = useMemo(() => lightConeMaterial(), []);
   const sky = useMemo(() => skyMaterial(), []);
   const headMat = useMemo(() => new MeshStandardMaterial({ color: "#20242a", emissive: LAMP, emissiveIntensity: 1, roughness: 0.5, metalness: 0.4 }), []);
+  const cam = MODULES[CAMERA_MODULE];
+  const walkLights = q.mobile ? 3 : 6;
 
   return (
     <group ref={group}>
@@ -235,7 +299,7 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
       </mesh>
       <Stars radius={900} depth={300} count={q.mobile ? 900 : 2200} factor={5} saturation={0.1} fade speed={0.2} />
 
-      {/* Lighting: moonlight from the upper left, sky bounce, and the pole lamps. */}
+      {/* Lighting: moonlight from the upper left, sky bounce, pole lamps, walkway lights, the open module's door lamp. */}
       <hemisphereLight args={["#1c2c4d", "#07090c", 0.5]} />
       <directionalLight
         ref={moon}
@@ -244,10 +308,10 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
         color={MOON}
         castShadow={q.shadows}
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-95}
-        shadow-camera-right={95}
-        shadow-camera-top={95}
-        shadow-camera-bottom={-95}
+        shadow-camera-left={-80}
+        shadow-camera-right={80}
+        shadow-camera-top={80}
+        shadow-camera-bottom={-80}
         shadow-camera-near={10}
         shadow-camera-far={400}
         shadow-bias={-0.0008}
@@ -256,19 +320,18 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
       {POLES.slice(0, q.poleLights).map(([x, z], i) => (
         <pointLight key={i} position={[x, 8.8, z - 0.9]} color="#dfeaff" intensity={260} distance={46} decay={2} />
       ))}
-      {/* Wall-washers along the base of the front facade, and the entrance. */}
-      {Array.from({ length: q.mobile ? 2 : 5 }, (_, i) => (
-        <pointLight key={`wash${i}`} position={[-24 + i * (48 / Math.max(1, (q.mobile ? 2 : 5) - 1)), 0.6, D / 2 + 1.2]} color="#c9d8f2" intensity={28} distance={16} decay={2} />
+      <pointLight position={[cam.x, MB + DOOR.h + 0.2, cam.z + ML / 2 + 0.6]} color="#dfeaff" intensity={14} distance={12} decay={2} />
+      {Array.from({ length: walkLights }, (_, i) => (
+        <pointLight key={`walk${i}`} position={[(i - (walkLights - 1) / 2) * MP + MP / 2, 3.2, 0]} color="#c9d8f2" intensity={22} distance={16} decay={2} />
       ))}
-      {/* Office annex spill and entrance light. */}
-      <pointLight position={[ANNEX.x, 4, ANNEX.z + ANNEX.d / 2 + 2]} color="#cfdcf0" intensity={60} distance={24} decay={2} />
+      <pointLight position={[26, 3.5, 20.5]} color="#cfdcf0" intensity={40} distance={20} decay={2} />
 
-      {/* Ground: far ground, the concrete site slab (reflective on desktop), lot stripes and the road. */}
+      {/* Ground: far ground, the concrete pad (reflective on desktop), lot stripes and the road. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, 0]} material={tex.asphaltFar} receiveShadow>
         <planeGeometry args={[1600, 1600]} />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0, 5]} receiveShadow>
-        <planeGeometry args={[150, 110]} />
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0, -4]} receiveShadow>
+        <planeGeometry args={[130, 100]} />
         {reflections ? (
           <MeshReflectorMaterial
             map={tex.concrete.map}
@@ -292,7 +355,7 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
           <meshStandardMaterial map={tex.concrete.map} normalMap={tex.concrete.normalMap} roughnessMap={tex.concrete.ormMap} metalnessMap={tex.concrete.ormMap} roughness={1} metalness={1} />
         )}
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.01, D / 2 + 27]} material={tex.road} receiveShadow>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.01, ROAD_Z]} material={tex.road} receiveShadow>
         <planeGeometry args={[320, 9]} />
       </mesh>
       <instancedMesh ref={stripes} args={[undefined, undefined, 60]}>
@@ -303,123 +366,83 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
         <planeGeometry />
         <meshStandardMaterial color="#d8d9d4" roughness={0.6} />
       </instancedMesh>
-      {/* Curb between lot and road */}
-      <mesh position={[0, 0.08, D / 2 + 22.4]} material={tex.steel} castShadow>
-        <boxGeometry args={[150, 0.16, 0.3]} />
+      <mesh position={[0, 0.08, ROAD_Z - 4.6]} material={tex.steel} castShadow>
+        <boxGeometry args={[130, 0.16, 0.3]} />
       </mesh>
 
-      {/* Main block: precast facade, roof, parapet. */}
-      <mesh position={[0, 0, D / 2]} geometry={frontGeom} material={tex.facadeFrontCut} castShadow receiveShadow />
-      <mesh position={[0, H / 2, -D / 2]} rotation-y={Math.PI} material={tex.facadeFront} castShadow receiveShadow>
-        <planeGeometry args={[W, H]} />
+      {/* The modules, and the spine corridor joining their far ends. */}
+      {MODULES.map((m, i) => (
+        <Module key={i} x={m.x} z={m.z} far={m.far} open={i === CAMERA_MODULE} tex={tex} />
+      ))}
+      <mesh position={[0, MB / 2, SPINE.z]} material={tex.steelDark} castShadow>
+        <boxGeometry args={[SPINE_LEN + 0.3, MB, SPINE.w + 0.3]} />
       </mesh>
-      <mesh position={[W / 2, H / 2, 0]} rotation-y={Math.PI / 2} material={tex.facadeSide} castShadow receiveShadow>
-        <planeGeometry args={[D, H]} />
+      <mesh position={[0, MB + SPINE.h / 2, SPINE.z]} material={tex.cladSpine} castShadow receiveShadow>
+        <boxGeometry args={[SPINE_LEN, SPINE.h, SPINE.w]} />
       </mesh>
-      <mesh position={[-W / 2, H / 2, 0]} rotation-y={-Math.PI / 2} material={tex.facadeSide} castShadow receiveShadow>
-        <planeGeometry args={[D, H]} />
+      <mesh position={[0, MB + SPINE.h + 0.06, SPINE.z]} material={tex.steelDark}>
+        <boxGeometry args={[SPINE_LEN + 0.1, 0.12, SPINE.w + 0.1]} />
       </mesh>
-      <mesh position={[0, H, 0]} rotation-x={-Math.PI / 2} material={tex.roof} receiveShadow>
-        <planeGeometry args={[W, D]} />
-      </mesh>
-      {/* Parapet */}
-      {[[0, D / 2, W + 0.6, 0.6], [0, -D / 2, W + 0.6, 0.6], [W / 2, 0, 0.6, D], [-W / 2, 0, 0.6, D]].map(([x, z, sx, sz], i) => (
-        <mesh key={i} position={[x, H + 0.45, z]} material={tex.steelDark} castShadow>
-          <boxGeometry args={[sx, 0.9, sz]} />
+      {/* Vestibules between each module and the spine */}
+      {MODULES.map((m, i) => (
+        <mesh key={i} position={[m.x, MB + 1.4, m.far ? SPINE.z - SPINE.w / 2 - 0.3 : SPINE.z + SPINE.w / 2 + 0.3]} material={tex.steel} castShadow>
+          <boxGeometry args={[2.2, 2.8, 0.7]} />
         </mesh>
       ))}
-      {/* Horizontal band and canopy over the entrance */}
-      <mesh position={[0, 3.6, D / 2 + 1.4]} material={tex.steelDark} castShadow>
-        <boxGeometry args={[9, 0.35, 3]} />
-      </mesh>
-      {/* Glass entrance doors: tinted, reflective, with the lit lobby visible behind. */}
-      <mesh position={[0, DOOR.h / 2, D / 2 + 0.02]}>
-        <planeGeometry args={[DOOR.w, DOOR.h]} />
-        <meshStandardMaterial color="#0b1118" transparent opacity={0.45} roughness={0.04} metalness={0.7} envMapIntensity={1.5} depthWrite={false} />
-      </mesh>
-      {[[-DOOR.w / 2, DOOR.h / 2, 0.08, DOOR.h], [DOOR.w / 2, DOOR.h / 2, 0.08, DOOR.h], [0, DOOR.h / 2, 0.05, DOOR.h], [0, DOOR.h, DOOR.w, 0.1]].map(([x, y, sx, sy], i) => (
-        <mesh key={i} position={[x, y, D / 2 + 0.04]} material={tex.steelDark}>
-          <boxGeometry args={[sx, sy, 0.08]} />
-        </mesh>
-      ))}
-      <mesh position={[0, 3.45, D / 2 + 1.4]}>
-        <planeGeometry args={[7, 2.4]} />
-        <meshStandardMaterial color="#1a1d22" emissive={new Color("#dfe8f6")} emissiveIntensity={0.9} roughness={0.8} side={DoubleSide} />
-      </mesh>
-      <instancedMesh ref={louvres} args={[undefined, undefined, 40]} material={tex.louvre}>
-        <planeGeometry />
-      </instancedMesh>
 
-      {/* Office annex: lit glass volume at the front-right corner. */}
-      <group position={[ANNEX.x, 0, ANNEX.z]}>
-        <mesh position={[0, ANNEX.h / 2, 0]} castShadow>
-          <boxGeometry args={[ANNEX.w, ANNEX.h, ANNEX.d]} />
-          <meshStandardMaterial map={tex.office} emissiveMap={tex.office} emissive={new Color("#ffffff")} emissiveIntensity={1.6} color="#0f141c" roughness={0.08} metalness={0.6} />
-        </mesh>
-        <mesh position={[0, ANNEX.h + 0.2, 0]} material={tex.steelDark} castShadow>
-          <boxGeometry args={[ANNEX.w + 0.5, 0.4, ANNEX.d + 0.5]} />
-        </mesh>
-        {/* Floor slabs read through the glass */}
-        <mesh position={[0, ANNEX.h / 2, 0]}>
-          <boxGeometry args={[ANNEX.w + 0.02, 0.45, ANNEX.d + 0.02]} />
-          <meshStandardMaterial color="#0c1016" roughness={0.9} />
-        </mesh>
-      </group>
-
-      {/* Rooftop plant: chillers with louvred sides, fan shrouds and spinning blades, and a pipe run. */}
-      {chillers.map(([x, z], i) => (
-        <group key={i} position={[x, H + 1.2, z]}>
-          <mesh material={tex.steel} castShadow>
-            <boxGeometry args={[7.4, 2.4, 3.2]} />
-          </mesh>
-          <mesh position={[0, 0, 1.61]} material={tex.louvreWide}>
-            <planeGeometry args={[6.6, 1.8]} />
-          </mesh>
-          <mesh position={[0, 0, -1.61]} rotation-y={Math.PI} material={tex.louvreWide}>
-            <planeGeometry args={[6.6, 1.8]} />
-          </mesh>
-          <mesh position={[0, -1.1, 0]} material={tex.steelDark}>
-            <boxGeometry args={[7.6, 0.3, 3.4]} />
-          </mesh>
-        </group>
-      ))}
+      {/* Rooftop fans: shrouds, grilles, spinning blades. */}
       <instancedMesh ref={shrouds} args={[undefined, undefined, fanSlots.length]} material={tex.steelDark} castShadow>
-        <cylinderGeometry args={[0.82, 0.82, 0.36, 18, 1, true]} />
+        <cylinderGeometry args={[0.52, 0.52, 0.26, 16, 1, true]} />
       </instancedMesh>
       <instancedMesh ref={grilles} args={[undefined, undefined, fanSlots.length]}>
-        <circleGeometry args={[0.8, 18]} />
+        <circleGeometry args={[0.5, 16]} />
         <meshStandardMaterial color="#090b0e" roughness={0.9} />
       </instancedMesh>
       <instancedMesh ref={fanBlades} args={[undefined, undefined, fanSlots.length]}>
-        <boxGeometry args={[1.45, 0.03, 0.22]} />
+        <boxGeometry args={[0.9, 0.025, 0.16]} />
         <meshStandardMaterial color="#5a6068" roughness={0.6} metalness={0.5} />
       </instancedMesh>
-      {[-5.5, 5.5].map((z) => (
-        <mesh key={z} position={[0, H + 0.7, z]} rotation-z={Math.PI / 2} material={tex.steel}>
-          <cylinderGeometry args={[0.3, 0.3, 54, 10]} />
-        </mesh>
-      ))}
 
-      {/* Generator yard on the west side: enclosures with exhaust stacks, two transformers. */}
-      <group position={[-W / 2 - 9, 0, 0]}>
-        {Array.from({ length: 6 }, (_, i) => (
-          <group key={i} position={[0, 0, -14 + i * 5.6]}>
-            <mesh position={[0, 1.4, 0]} material={tex.steel} castShadow>
-              <boxGeometry args={[5.2, 2.8, 2.4]} />
+      {/* Power yard on the west side: two generator containers with exhaust stacks, transformers, switchgear. */}
+      <group position={[-(MC / 2) * MP - 9, 0, -8]}>
+        {[-3.5, 3.5].map((z) => (
+          <group key={z} position={[0, 0, z]}>
+            <mesh position={[0, 1.6, 0]} material={tex.cladDark} castShadow>
+              <boxGeometry args={[12.2, 2.9, 2.5]} />
             </mesh>
-            <mesh position={[2.61, 1.4, 0]} rotation-y={Math.PI / 2} material={tex.louvre}>
+            <mesh position={[-5, 3.9, 0.6]} material={tex.steelDark} castShadow>
+              <cylinderGeometry args={[0.24, 0.24, 2, 10]} />
+            </mesh>
+            <mesh position={[6.11, 1.6, 0]} rotation-y={Math.PI / 2} material={tex.louvre}>
               <planeGeometry args={[2.2, 2.2]} />
-            </mesh>
-            <mesh position={[-1.6, 3.9, 0.6]} material={tex.steelDark} castShadow>
-              <cylinderGeometry args={[0.22, 0.22, 2.2, 10]} />
             </mesh>
           </group>
         ))}
-        {[-24, 22].map((z) => (
-          <mesh key={z} position={[1, 1.3, z]} material={tex.steelDark} castShadow>
+        {[-14, -19].map((z) => (
+          <mesh key={z} position={[2, 1.3, z]} material={tex.steelDark} castShadow>
             <boxGeometry args={[3, 2.6, 3.4]} />
           </mesh>
         ))}
+        <mesh position={[-4, 1.4, -16]} material={tex.steel} castShadow>
+          <boxGeometry args={[6, 2.8, 2.4]} />
+        </mesh>
+      </group>
+
+      {/* NOC / office module near the entrance, with a lit window band. */}
+      <group position={[26, 0, 15]}>
+        <mesh position={[0, MB / 2, 0]} material={tex.steelDark}>
+          <boxGeometry args={[12.4, MB, 4.4]} />
+        </mesh>
+        <mesh position={[0, MB + 1.7, 0]} material={tex.cladLong} castShadow>
+          <boxGeometry args={[12.2, 3.4, 4.2]} />
+        </mesh>
+        <mesh position={[0, MB + 2.1, 2.12]}>
+          <planeGeometry args={[10.5, 1.5]} />
+          <meshStandardMaterial map={tex.office} emissiveMap={tex.office} emissive={new Color("#ffffff")} emissiveIntensity={1.5} color="#0f141c" roughness={0.08} metalness={0.6} />
+        </mesh>
+        <mesh position={[0, MB + 3.5, 0]} material={tex.steelDark}>
+          <boxGeometry args={[12.4, 0.2, 4.4]} />
+        </mesh>
       </group>
 
       {/* Perimeter fence: posts and chain-link. */}
@@ -427,10 +450,10 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
         <cylinderGeometry args={[0.045, 0.045, 2.4, 6]} />
       </instancedMesh>
       {[
-        [0, -50, 148, 0],
-        [0, D / 2 + 36, 148, 0],
-        [-74, 2, 86, Math.PI / 2],
-        [74, 2, 86, Math.PI / 2],
+        [0, -44, 120, 0],
+        [0, ROAD_Z - 4, 120, 0],
+        [-60, -6, 76, Math.PI / 2],
+        [60, -6, 76, Math.PI / 2],
       ].map(([x, z, len, rot], i) => (
         <mesh key={i} position={[x, 1.2, z]} rotation-y={rot}>
           <planeGeometry args={[len, 2.4]} />
@@ -438,7 +461,7 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
         </mesh>
       ))}
 
-      {/* Light poles: shaft, arm, luminaire (HDR emissive), haze cone and ground pool. */}
+      {/* Light poles: shaft, luminaire (HDR emissive), haze cone and ground pool. */}
       <instancedMesh ref={polesMesh} args={[undefined, undefined, POLES.length]} material={tex.steelDark} castShadow>
         <cylinderGeometry args={[0.1, 0.16, 9, 8]} />
       </instancedMesh>

@@ -9,15 +9,15 @@ const SEGMENTS = 8;
 const SHARE = 5;
 
 /**
- * Target points in a normalized frame: the building spans x ∈ [-0.5, 0.5],
- * its walls y ∈ [0, 0.24], rooftop units above, the glass annex at the right.
- * One segment is "your share". Matches the static Silhouette.
+ * Target points in a normalized frame: a row of eight prefab modules spanning
+ * x ∈ [-0.5, 0.5], each with a rooftop cooling unit, standing on a ground
+ * line. One module is "your share". Matches the static Silhouette.
  */
 function buildTargets(total: number) {
   const rnd = rng(23);
   const pts: number[] = [];
   const share: number[] = [];
-  const H = 0.24;
+  const H = 0.2;
   const push = (x: number, y: number, s = 0) => {
     pts.push(x + (rnd() - 0.5) * 0.002, y + (rnd() - 0.5) * 0.002, 0);
     share.push(s);
@@ -29,31 +29,34 @@ function buildTargets(total: number) {
     }
   };
   const budget = (f: number) => Math.round(total * f);
-  // Main block outline
-  edge(-0.5, 0, 0.5, 0, budget(0.11));
-  edge(-0.5, H, 0.5, H, budget(0.11));
-  edge(-0.5, 0, -0.5, H, budget(0.03));
-  edge(0.5, 0, 0.5, H, budget(0.03));
-  // Rooftop units
-  for (let u = 0; u < 6; u++) {
-    const x0 = -0.42 + u * 0.15;
-    const w = 0.08;
-    edge(x0, H, x0, H + 0.045, budget(0.007));
-    edge(x0 + w, H, x0 + w, H + 0.045, budget(0.007));
-    edge(x0, H + 0.045, x0 + w, H + 0.045, budget(0.012));
+  const slot = 1 / SEGMENTS;
+  const gap = slot * 0.14;
+  const mw = slot - gap;
+  for (let m = 0; m < SEGMENTS; m++) {
+    const x0 = -0.5 + m * slot + gap / 2;
+    const x1 = x0 + mw;
+    // Module outline
+    edge(x0, 0, x1, 0, budget(0.014));
+    edge(x0, H, x1, H, budget(0.014));
+    edge(x0, 0, x0, H, budget(0.022));
+    edge(x1, 0, x1, H, budget(0.022));
+    // Door at the base, rooftop unit on top
+    const dx = x0 + mw * 0.5;
+    edge(dx - 0.012, 0, dx - 0.012, 0.05, budget(0.004));
+    edge(dx + 0.012, 0, dx + 0.012, 0.05, budget(0.004));
+    edge(dx - 0.012, 0.05, dx + 0.012, 0.05, budget(0.003));
+    const ux0 = x0 + mw * 0.25;
+    const ux1 = x0 + mw * 0.75;
+    edge(ux0, H, ux0, H + 0.035, budget(0.004));
+    edge(ux1, H, ux1, H + 0.035, budget(0.004));
+    edge(ux0, H + 0.035, ux1, H + 0.035, budget(0.006));
   }
-  // Glass annex at the right, in front of the block
-  edge(0.26, 0, 0.26, 0.13, budget(0.012));
-  edge(0.26, 0.13, 0.52, 0.13, budget(0.02));
-  edge(0.52, 0, 0.52, 0.13, budget(0.012));
-  // Segment dividers
-  for (let s = 1; s < SEGMENTS; s++) edge(-0.5 + s / SEGMENTS, 0, -0.5 + s / SEGMENTS, H, budget(0.018));
-  // Ground line, wider than the building
+  // Ground line, wider than the row
   edge(-0.62, -0.004, 0.62, -0.004, budget(0.06));
-  // Your share: a filled segment
-  const sx0 = -0.5 + SHARE / SEGMENTS;
+  // Your share: one filled module
+  const sx0 = -0.5 + SHARE * slot + gap / 2;
   const remaining = total - share.length;
-  for (let i = 0; i < remaining; i++) push(sx0 + 0.006 + rnd() * (1 / SEGMENTS - 0.012), 0.006 + rnd() * (H - 0.012), 1);
+  for (let i = 0; i < remaining; i++) push(sx0 + 0.004 + rnd() * (mw - 0.008), 0.005 + rnd() * (H - 0.01), 1);
   return { pts: new Float32Array(pts), share: new Float32Array(share) };
 }
 
