@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BRAND_NAME } from "../../shared/brand";
+import { Logo } from "./Logo";
 import { scrollToId } from "../lib/scroll";
 
 /** Fixed header. The "Join the list" control stays reachable through the whole 3D sequence. */
@@ -23,8 +23,8 @@ export function Header() {
         onDark ? "on-dark bg-night-950/70 text-white backdrop-blur-sm" : "bg-paper/92 text-ink shadow-[0_1px_0_var(--color-rule)] backdrop-blur-sm"
       }`}
     >
-      <a href="#top" className="font-heading text-xl tracking-tight" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0 }); }}>
-        {BRAND_NAME}
+      <a href="#top" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0 }); }}>
+        <Logo />
       </a>
       <nav aria-label="Primary" className="flex items-center gap-6">
         <a href="#how-it-works" className="hidden text-small underline-offset-4 hover:underline md:inline" onClick={(e) => { e.preventDefault(); scrollToId("how-it-works"); }}>

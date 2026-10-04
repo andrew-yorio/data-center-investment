@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { BRAND_NAME, CONTACT_EMAIL, LEGAL_ENTITY } from "../../shared/brand";
 import { Footer } from "./Footer";
+import { Logo } from "./Logo";
 
 const LAST_UPDATED = "October 3, 2026";
 
@@ -20,7 +21,7 @@ export function Privacy() {
   return (
     <>
       <header className="gutter border-b border-rule py-4">
-        <a href="/" className="font-heading text-xl tracking-tight">{BRAND_NAME}</a>
+        <a href="/"><Logo /></a>
       </header>
       <main className="gutter section-pad">
         <div className="mx-auto max-w-[72ch]">

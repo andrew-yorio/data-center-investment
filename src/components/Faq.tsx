@@ -8,6 +8,10 @@ const FAQS: { q: string; a: ReactNode }[] = [
     a: "No. This site only gauges interest. No securities are being offered or sold here, and we can't accept any money. If an offering happens, it will open later through a registered funding portal.",
   },
   {
+    q: "What is a modular data center?",
+    a: "Instead of one large building, a modular data center is made of prefabricated modules, each holding its own racks of servers, power and cooling. Modules are built off-site and installed on prepared ground, and more can be added over time. How many modules the project would start with, and whether it adds more, is still to be decided.",
+  },
+  {
     q: "Am I committing to anything?",
     a: "No. Joining the list is a non-binding indication of interest. You're not obligated to invest, and you can ask us to remove your information at any time.",
   },
@@ -20,7 +24,7 @@ const FAQS: { q: string; a: ReactNode }[] = [
     a: "To be announced. Eligibility, any minimum amount and any limits will be set out in the official offering documents, and the funding portal will run its own identity checks.",
   },
   {
-    q: "Where and when will the data center be built?",
+    q: "Where and when will the modules be installed?",
     a: "Site selection is underway and the timeline is still to be announced. We'll share both with the list once they're settled.",
   },
   {

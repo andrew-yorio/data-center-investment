@@ -1,4 +1,4 @@
-# Data center fund: interest site
+# ComputeStake: interest site
 
 A one-page, interest-only site, modeled on a Regulation Crowdfunding "testing the waters" communication. It collects a name, email, rough investment range and a non-binding acknowledgment. It never takes money, commitments or offers.
 
