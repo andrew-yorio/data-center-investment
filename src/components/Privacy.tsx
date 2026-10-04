@@ -3,7 +3,7 @@ import { BRAND_NAME, CONTACT_EMAIL, LEGAL_ENTITY } from "../../shared/brand";
 import { Footer } from "./Footer";
 import { Logo } from "./Logo";
 
-const LAST_UPDATED = "October 3, 2026";
+const LAST_UPDATED = "October 4, 2026";
 
 function Block({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -37,7 +37,7 @@ export function Privacy() {
               <li>The investment range you chose, and your acknowledgment that this is non-binding.</li>
               <li>The IP address your sign-up came from, taken from the connection by our hosting provider. We never ask you for it. It is stored with your sign-up and deleted with it.</li>
               <li>Your browser's user-agent string (the browser and operating system name it reports).</li>
-              <li>Whether and when you confirmed your email address.</li>
+              <li>When you signed up.</li>
             </ul>
             <p>We do not collect payment details, Social Security numbers or any government ID. If an offering opens, identity checks happen on the registered funding portal, under that portal's own privacy policy.</p>
           </Block>
@@ -46,7 +46,7 @@ export function Privacy() {
             <ul>
               <li>Your name, email and range let us gauge interest in the project and contact you about it.</li>
               <li>IP addresses and user-agent strings help us prevent spam, automated sign-ups and abuse, including limiting how many sign-ups come from one address.</li>
-              <li>Email confirmation makes sure the person who signed up controls that email address.</li>
+              <li>We check that your email address's domain can receive mail (a DNS lookup of the domain only), to catch typos and made-up addresses.</li>
             </ul>
             <p>We only email you about this project. We don't sell or rent your information, and we don't use it for advertising.</p>
           </Block>
@@ -56,13 +56,13 @@ export function Privacy() {
             <ul>
               <li>Cloudflare hosts the site and runs Turnstile, a check that tells people from bots. Turnstile processes technical data about your browser.</li>
               <li>Supabase stores sign-ups in an access-restricted database.</li>
-              <li>An email delivery provider sends the confirmation email and updates.</li>
+              <li>An email delivery provider sends updates.</li>
             </ul>
             <p>This site does not use analytics or advertising cookies. Fonts are served from our own domain.</p>
           </Block>
 
           <Block title="How long we keep it">
-            <p>Unconfirmed sign-ups are deleted after 30 days. Confirmed sign-ups, including the stored IP address, are kept until this interest-gauging phase ends (when an offering opens or the project is abandoned) or until you ask us to delete them, whichever comes first. Rate-limiting records of IP addresses are deleted after 24 hours.</p>
+            <p>Sign-ups, including the stored IP address, are kept until this interest-gauging phase ends (when an offering opens or the project is abandoned) or until you ask us to delete them, whichever comes first. Rate-limiting records of IP addresses are deleted after 24 hours.</p>
           </Block>
 
           <Block title="Deleting or correcting your information">

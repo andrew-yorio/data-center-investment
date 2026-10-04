@@ -21,6 +21,10 @@ export interface Env {
   SMTP_PASS?: string;
   /** Defaults to 465 (implicit TLS). */
   SMTP_PORT?: string;
+  /** "1" to require a confirmation email (double opt-in). Otherwise sign-ups are confirmed immediately and no email is sent. */
+  REQUIRE_EMAIL_CONFIRMATION?: string;
+  /** "0" turns off the MX lookup on the email's domain (local tests use example.com, which accepts no mail). */
+  EMAIL_DOMAIN_CHECK?: string;
   /** "1" to log confirmation links instead of sending when EMAIL_API_KEY is unset (local dev only). */
   DEV_LOG_EMAILS?: string;
 }

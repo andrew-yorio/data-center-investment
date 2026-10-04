@@ -5,6 +5,7 @@ import { sha256Hex } from "./crypto";
 import type { Env } from "./env";
 
 const env: Env = { SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "k", TURNSTILE_SECRET_KEY: "s" };
+const envConfirm: Env = { ...env, REQUIRE_EMAIL_CONFIRMATION: "1" };
 
 const good = { name: "Ada Lovelace", email: "ada@example.com", investmentRange: "500_2500", acknowledged: true, turnstileToken: "tok" };
 
@@ -29,13 +30,14 @@ function deps(over: Partial<Record<string, unknown>> = {}): Deps & { calls: { fn
     }) as unknown as Deps["rpc"],
     verifyTurnstile: vi.fn(async () => (over.human ?? true) as boolean),
     sendConfirmationEmail: vi.fn(async () => {}),
+    domainAcceptsMail: vi.fn(async () => (over.mx ?? true) as boolean),
   };
 }
 
 describe("handleSignup", () => {
   it("creates a sign-up, stores only the token hash, and emails the raw token", async () => {
     const d = deps();
-    const res = await handleSignup(req(good), env, d);
+    const res = await handleSignup(req(good), envConfirm, d);
     expect(res.status).toBe(200);
     const reg = d.calls.find((c) => c.fn === "register_signup")!;
     expect(reg.args.p_ip).toBe("203.0.113.7");
@@ -47,9 +49,9 @@ describe("handleSignup", () => {
   });
 
   it("returns an identical response for duplicates and sends no email on noop", async () => {
-    const a = await (await handleSignup(req(good), env, deps())).json();
+    const a = await (await handleSignup(req(good), envConfirm, deps())).json();
     const d = deps({ outcome: "noop" });
-    const res = await handleSignup(req(good), env, d);
+    const res = await handleSignup(req(good), envConfirm, d);
     expect(await res.json()).toEqual(a);
     expect(d.sendConfirmationEmail).not.toHaveBeenCalled();
   });
@@ -58,8 +60,33 @@ describe("handleSignup", () => {
     const d = deps();
     d.sendConfirmationEmail = vi.fn(async () => { throw new Error("down"); });
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect((await handleSignup(req(good), env, d)).status).toBe(200);
+    expect((await handleSignup(req(good), envConfirm, d)).status).toBe(200);
     err.mockRestore();
+  });
+
+  it("without email confirmation, confirms the sign-up straight away and sends nothing", async () => {
+    const d = deps();
+    const res = await handleSignup(req(good), env, d);
+    expect(await res.json()).toMatchObject({ ok: true, confirmEmail: false });
+    const reg = d.calls.find((c) => c.fn === "register_signup")!;
+    const conf = d.calls.find((c) => c.fn === "confirm_signup")!;
+    expect(conf.args.p_token_hash).toBe(reg.args.p_token_hash);
+    expect(d.sendConfirmationEmail).not.toHaveBeenCalled();
+  });
+
+  it("gives duplicates the same response without confirming again", async () => {
+    const a = await (await handleSignup(req(good), env, deps())).json();
+    const d = deps({ outcome: "noop" });
+    expect(await (await handleSignup(req(good), env, d)).json()).toEqual(a);
+    expect(d.calls.some((c) => c.fn === "confirm_signup")).toBe(false);
+  });
+
+  it("rejects an email whose domain can't receive mail, before writing anything", async () => {
+    const d = deps({ mx: false });
+    const res = await handleSignup(req(good), env, d);
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { fields: { email?: string } }).fields.email).toBeTruthy();
+    expect(d.calls.some((c) => c.fn === "register_signup")).toBe(false);
   });
 
   it("rejects a failed Turnstile check without touching the signups table", async () => {

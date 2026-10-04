@@ -5,15 +5,17 @@ import { generateToken, sha256Hex } from "./crypto";
 import { rpc } from "./supabase";
 import { verifyTurnstile } from "./turnstile";
 import { sendConfirmationEmail } from "./email";
+import { domainAcceptsMail, typoDomainSuggestion } from "./mx";
 
 /** Seams for tests. Production uses the real implementations. */
 export interface Deps {
   rpc: typeof rpc;
   verifyTurnstile: typeof verifyTurnstile;
   sendConfirmationEmail: typeof sendConfirmationEmail;
+  domainAcceptsMail: (email: string) => Promise<boolean>;
 }
 
-const realDeps: Deps = { rpc, verifyTurnstile, sendConfirmationEmail };
+const realDeps: Deps = { rpc, verifyTurnstile, sendConfirmationEmail, domainAcceptsMail: (email) => domainAcceptsMail(email) };
 
 const MAX_BODY_BYTES = 4096;
 
@@ -25,7 +27,8 @@ function json(status: number, body: unknown, extra: HeadersInit = {}): Response 
 }
 
 /** Same body for new, duplicate and already-confirmed emails, so the form can't reveal who signed up. */
-const SUCCESS = { ok: true, message: "Check your email for a confirmation link to finish joining the list." };
+const SUCCESS_CONFIRM = { ok: true, confirmEmail: true, message: "Check your email for a confirmation link to finish joining the list." };
+const SUCCESS_JOINED = { ok: true, confirmEmail: false, message: "You're on the list." };
 
 export async function handleSignup(request: Request, env: Env, deps: Deps = realDeps): Promise<Response> {
   const url = new URL(request.url);
@@ -64,11 +67,20 @@ export async function handleSignup(request: Request, env: Env, deps: Deps = real
     if (!parsed.ok) return json(422, { ok: false, error: "validation", fields: parsed.errors });
     const input = parsed.value;
 
+    const suggestion = typoDomainSuggestion(input.email);
+    if (suggestion) {
+      return json(422, { ok: false, error: "validation", fields: { email: `Did you mean ${input.email.slice(0, input.email.lastIndexOf("@"))}@${suggestion}?` } });
+    }
+    if (env.EMAIL_DOMAIN_CHECK !== "0" && !(await deps.domainAcceptsMail(input.email))) {
+      return json(422, { ok: false, error: "validation", fields: { email: "That email address can't receive mail. Check it for typos." } });
+    }
+
     const human = await deps.verifyTurnstile(env.TURNSTILE_SECRET_KEY, input.turnstileToken, ip);
     if (!human) {
       return json(400, { ok: false, error: "turnstile_failed", fields: { turnstileToken: "Verification failed. Please try again." } });
     }
 
+    const confirmByEmail = env.REQUIRE_EMAIL_CONFIRMATION === "1";
     const token = generateToken();
     const flagReason = flagSignup(input.name, input.email, input.investmentRange);
     const outcome = await deps.rpc<"created" | "resend" | "noop">(env, "register_signup", {
@@ -82,6 +94,14 @@ export async function handleSignup(request: Request, env: Env, deps: Deps = real
       p_flag_reason: flagReason,
     });
 
+    if (!confirmByEmail) {
+      // No confirmation email: the sign-up counts as soon as it passes the checks above.
+      if (outcome === "created" || outcome === "resend") {
+        await deps.rpc<string>(env, "confirm_signup", { p_token_hash: await sha256Hex(token) });
+      }
+      return json(200, SUCCESS_JOINED);
+    }
+
     if (outcome === "created" || outcome === "resend") {
       const confirmUrl = `${url.origin}/api/confirm?token=${encodeURIComponent(token)}`;
       try {
@@ -91,7 +111,7 @@ export async function handleSignup(request: Request, env: Env, deps: Deps = real
         console.error("confirmation email failed", err);
       }
     }
-    return json(200, SUCCESS);
+    return json(200, SUCCESS_CONFIRM);
   } catch (err) {
     console.error("signup failed", err);
     return json(500, { ok: false, error: "server", message: "Something went wrong on our side. Please try again shortly." });

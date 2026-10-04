@@ -48,6 +48,7 @@ export function Signup() {
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
   const [serverErrors, setServerErrors] = useState<Errors>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [emailSent, setEmailSent] = useState(false);
   const [formMessage, setFormMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -92,9 +93,10 @@ export function Signup() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...values, name: values.name.trim(), email: values.email.trim(), turnstileToken: token }),
       });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; fields?: Errors; message?: string };
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; confirmEmail?: boolean; fields?: Errors; message?: string };
       if (res.ok && data.ok) {
         removeTurnstile();
+        setEmailSent(data.confirmEmail === true);
         setStatus("success");
         return;
       }
@@ -133,7 +135,7 @@ export function Signup() {
             Register your interest and get notified as plans firm up. Nothing is paid, and nothing you tell us here is a commitment.
           </p>
           <ul className="mt-8 space-y-3 text-body">
-            <li className="border-t border-rule pt-3">We'll email you a link to confirm your address.</li>
+            <li className="border-t border-rule pt-3">We only email you about this project.</li>
             <li className="border-t border-rule pt-3">We never ask for payment details or ID here.</li>
             <li className="border-t border-rule pt-3">
               Questions: <a className="font-semibold underline underline-offset-4" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
@@ -153,11 +155,23 @@ export function Signup() {
 
           {status === "success" ? (
             <div ref={successRef} tabIndex={-1} role="status" className="border-t-4 border-ink bg-surface p-6 outline-none sm:p-10">
-              <h3 className="font-heading text-h3">Check your email</h3>
-              <p className="measure mt-3 text-body-lg text-ink-muted">
-                We've sent a confirmation link to <strong className="text-ink">{values.email.trim()}</strong>. Click it within 48 hours to finish
-                joining the list. If you don't see it, check your spam folder.
-              </p>
+              {emailSent ? (
+                <>
+                  <h3 className="font-heading text-h3">Check your email</h3>
+                  <p className="measure mt-3 text-body-lg text-ink-muted">
+                    We've sent a confirmation link to <strong className="text-ink">{values.email.trim()}</strong>. Click it within 48 hours to finish
+                    joining the list. If you don't see it, check your spam folder.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-heading text-h3">You're on the list</h3>
+                  <p className="measure mt-3 text-body-lg text-ink-muted">
+                    Thanks. We'll be in touch at <strong className="text-ink">{values.email.trim()}</strong> as details are finalized. Nothing is paid and
+                    nothing is binding.
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <form ref={formRef} noValidate onSubmit={onSubmit} className="border-t-4 border-ink bg-surface p-6 sm:p-10">

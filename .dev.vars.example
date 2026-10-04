@@ -7,3 +7,7 @@ EMAIL_API_KEY=
 EMAIL_FROM=Placeholder <hello@example.com>
 # Optional. When EMAIL_API_KEY is empty and this is "1", confirmation links are logged instead of emailed.
 DEV_LOG_EMAILS=1
+
+# Local E2E tests exercise the email-confirmation flow and use example.com addresses.
+REQUIRE_EMAIL_CONFIRMATION=1
+EMAIL_DOMAIN_CHECK=0

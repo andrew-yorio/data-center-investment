@@ -47,14 +47,14 @@ A one-page, interest-only site, modeled on a Regulation Crowdfunding "testing th
 ## How sign-up works
 
 1. The browser posts JSON to `/api/signup`. Turnstile only loads once the form nears the viewport.
-2. The Function checks origin, content type and body size; reads the IP from `CF-Connecting-IP`; applies the rate limit; validates fields; verifies Turnstile; and flags (never rejects) disposable email domains and obviously fake names on the $10,000+ range.
-3. `register_signup()` inserts the row, or, for an unconfirmed duplicate, rotates the token (at most once every 10 minutes). Only the SHA-256 hash of the token is stored, and tokens expire after 48 hours.
-4. The response is identical for new, duplicate and confirmed emails, so the form can't reveal who signed up.
-5. `/api/confirm?token=…` sets `confirmed = true` and redirects to `/?confirmed=confirmed#signup`.
+2. The Worker checks origin, content type and body size; reads the IP from `CF-Connecting-IP`; applies the rate limits; validates fields; verifies Turnstile; and flags (never rejects) disposable email domains and obviously fake names on the $10,000+ range.
+3. It checks that the email's domain can receive mail (an MX lookup over Cloudflare DNS-over-HTTPS). Typo and made-up domains are rejected with a field error. If the lookup itself fails, the sign-up is allowed.
+4. `register_signup()` inserts the row (a duplicate email adds nothing).
+5. **Default (no confirmation email):** the row is marked confirmed straight away and the form says "You're on the list". No email is sent, so no sending domain is needed.
+6. **With `REQUIRE_EMAIL_CONFIRMATION=1`** (double opt-in, needs working email): the row stays unconfirmed, a confirmation link is emailed (token stored only as a SHA-256 hash, 48-hour expiry, resend at most every 10 minutes), and `/api/confirm?token=…` confirms it. Unconfirmed rows are purged after 30 days. Turn this on once a sending domain is verified, and restore the confirmation wording in the FAQ, the form sidebar and the privacy policy.
+7. The response is identical for new and duplicate emails, so the form can't reveal who signed up.
 
 Review flagged rows with `select * from signups where flagged;`.
-
-Note that some corporate email security scanners pre-open links, which can confirm a sign-up without a human click. If that becomes a problem, change the confirm link to land on a page with a "Confirm" button that POSTs.
 
 ## Local development
 
