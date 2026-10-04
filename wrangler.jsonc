@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Must match the Worker's name in the Cloudflare dashboard (Workers Builds checks this).
+  "name": "data-center-investment",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  // Builds the static site before every `wrangler deploy`, so the dashboard's
+  // Build command can stay empty.
+  "build": { "command": "npm run build" },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // Cheap first gate in front of the per-IP limit enforced in Postgres.
+  "ratelimits": [
+    { "name": "SIGNUP_RATE_LIMITER", "namespace_id": "4201", "simple": { "limit": 5, "period": 60 } }
+  ],
+  // Keep plain-text variables set in the dashboard (e.g. EMAIL_FROM) across deploys.
+  "keep_vars": true,
+  // Serve on <name>.<account>.workers.dev so every deploy prints a URL.
+  "workers_dev": true,
+  // Serve on <name>.<account>.workers.dev so every deploy prints a URL.
+  "workers_dev": true,
+  "preview_urls": true,
+  "observability": { "enabled": true }
+}

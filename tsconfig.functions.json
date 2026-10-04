@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["functions", "server", "shared"]
+  "include": ["worker", "server", "shared"]
 }

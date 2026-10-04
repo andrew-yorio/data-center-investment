@@ -24,7 +24,7 @@ export default defineConfig({
     },
   },
   server: {
-    // `npm run dev` serves the frontend only; run `npm run pages:dev` for the API.
+    // `npm run dev` serves the frontend only; run `npm run dev:api` for the Worker API.
     proxy: { "/api": "http://localhost:8788" },
   },
 });

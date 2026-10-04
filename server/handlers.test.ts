@@ -76,6 +76,14 @@ describe("handleSignup", () => {
     expect(d.verifyTurnstile).not.toHaveBeenCalled();
   });
 
+  it("rejects at the edge rate limiter before touching Postgres", async () => {
+    const d = deps();
+    const limited = { ...env, SIGNUP_RATE_LIMITER: { limit: async () => ({ success: false }) } };
+    const res = await handleSignup(req(good), limited, d);
+    expect(res.status).toBe(429);
+    expect(d.calls).toHaveLength(0);
+  });
+
   it("validates fields", async () => {
     const res = await handleSignup(req({ ...good, name: "", email: "nope", investmentRange: "1m", acknowledged: false }), env, deps());
     expect(res.status).toBe(422);

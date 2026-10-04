@@ -11,10 +11,10 @@ A one-page, interest-only site, modeled on a Regulation Crowdfunding "testing th
 | Frontend | React 19 + Vite 8, Tailwind CSS v4 (CSS-first `@theme` in `src/index.css`) |
 | 3D intro | three.js via React Three Fiber + drei, lazy-loaded (`src/scene/`) |
 | Scroll | Lenis; the camera path is driven by intro scroll progress (`src/scene/path.ts`) |
-| Hosting | Cloudflare Pages (static assets + Pages Functions in `functions/api/`) |
+| Hosting | Cloudflare Workers with static assets (`wrangler.jsonc`, API in `worker/index.ts`) |
 | API | `POST /api/signup`, `GET /api/confirm` (logic in `server/`) |
 | Bot check | Cloudflare Turnstile, verified server-side |
-| Rate limiting | Per-IP, enforced in Postgres (see note below) |
+| Rate limiting | Workers rate-limiting binding, plus a per-IP limit in Postgres |
 | Database | Supabase Postgres, written only by the service role key |
 | Email | Resend (any provider works; see `server/email.ts`) |
 
@@ -22,28 +22,26 @@ A one-page, interest-only site, modeled on a Regulation Crowdfunding "testing th
 
 **Motion:** Motion (the animation library) was in the original plan but isn't used. The design keeps one orchestrated moment (the 3D scrub). Everything else is plain CSS transitions, so a JS animation library would only add weight.
 
-## Deploying on Cloudflare Pages
+## Deploying on Cloudflare Workers (Workers Builds)
+
+`wrangler.jsonc` drives the deploy. `npx wrangler deploy` runs `npm run build` first, serves `dist/` as static assets, and sends only `/api/*` to `worker/index.ts`. The URL is printed at the end of each deploy (`https://data-center-investment.<account>.workers.dev`).
 
 1. **Database.** In the Supabase SQL Editor, run `supabase/migrations/20261003000000_signups.sql`. Then enable `pg_cron` and run `20261003000100_retention.sql`; this is the 30-day purge of unconfirmed sign-ups promised in the privacy policy.
-2. **Turnstile.** Create a widget in the Cloudflare dashboard for your domain. Note its site key and secret key.
+2. **Turnstile.** Create a widget for your domain, including the `workers.dev` hostname while you test. Note its site key and secret key.
 3. **Email.** Verify a sending domain with Resend and create an API key.
-4. **Pages project settings** (Settings > Build):
-   - Framework preset: None (or Vite). Build command `npm run build`. Output directory `dist`. Root directory `/`.
-   - Node: `.nvmrc` pins Node 22.
-5. **Variables and secrets** (Settings > Variables and Secrets), for Production and Preview:
+4. **Worker settings.** Deploy command `npx wrangler deploy`. The Build command can stay empty. The Worker name must match `name` in `wrangler.jsonc`.
+5. **Variables:**
 
-   | Name | Type | Notes |
+   | Name | Where | Notes |
    |---|---|---|
-   | `VITE_TURNSTILE_SITE_KEY` | Plain text | Public site key. Needed **at build time**, so redeploy after setting it. |
+   | `VITE_TURNSTILE_SITE_KEY` | Build variables | Public site key, read at build time |
    | `SUPABASE_URL` | Secret | `https://<project>.supabase.co` |
-   | `SUPABASE_SERVICE_ROLE_KEY` | Secret | Service role key. It never reaches the browser. |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Secret | Never reaches the browser |
    | `TURNSTILE_SECRET_KEY` | Secret | |
    | `EMAIL_API_KEY` | Secret | Resend API key |
-   | `EMAIL_FROM` | Plain text | e.g. `Brand <hello@yourdomain.com>` on the verified domain |
+   | `EMAIL_FROM` | Variable | e.g. `Brand <hello@yourdomain.com>`. Kept across deploys by `keep_vars`. |
 
-There is deliberately no `wrangler.jsonc`. A Wrangler file with `pages_build_output_dir` would become the source of truth and lock these dashboard settings.
-
-**Rate limiting note:** Pages Functions don't support the Workers rate-limiting binding. Instead, `check_signup_rate_limit()` allows 5 attempts per IP per 10 minutes, counted in Postgres. If you later move to Workers with static assets, the binding could replace it.
+**Rate limiting:** the `SIGNUP_RATE_LIMITER` binding allows 5 requests per IP per minute at the edge. Behind it, `check_signup_rate_limit()` in Postgres allows 5 attempts per IP per 10 minutes.
 
 ## How sign-up works
 
@@ -65,7 +63,7 @@ cp .dev.vars.example .dev.vars          # local secrets (git-ignored)
 echo 'VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA' > .env.local   # Turnstile always-pass test key
 scripts/localdb/up.sh                   # Postgres + PostgREST in Docker on :54321; prints a service key
 # put SUPABASE_REST_URL=http://localhost:54321 and the printed SERVICE_KEY into .dev.vars
-npm run build && scripts/dev-api.sh     # wrangler pages dev on :8788
+scripts/dev-api.sh                      # wrangler dev on :8788 (builds first)
 ```
 
 With `DEV_LOG_EMAILS=1` and no `EMAIL_API_KEY`, confirmation links are printed to the wrangler log instead of being emailed.

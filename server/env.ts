@@ -1,4 +1,11 @@
+/** Workers rate limiting binding (see wrangler.jsonc). */
+export interface RateLimiter {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface Env {
+  /** Optional so tests and local runs without the binding still work; Postgres enforces the limit regardless. */
+  SIGNUP_RATE_LIMITER?: RateLimiter;
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   /** Optional override for local testing against a bare PostgREST. Defaults to `${SUPABASE_URL}/rest/v1`. */

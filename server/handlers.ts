@@ -54,7 +54,8 @@ export async function handleSignup(request: Request, env: Env, deps: Deps = real
   }
 
   try {
-    const allowed = await deps.rpc<boolean>(env, "check_signup_rate_limit", { p_ip: ip });
+    const edgeOk = env.SIGNUP_RATE_LIMITER ? (await env.SIGNUP_RATE_LIMITER.limit({ key: ip })).success : true;
+    const allowed = edgeOk && (await deps.rpc<boolean>(env, "check_signup_rate_limit", { p_ip: ip }));
     if (!allowed) {
       return json(429, { ok: false, error: "rate_limited", message: "Too many attempts. Please wait a few minutes and try again." }, { "retry-after": "600" });
     }
