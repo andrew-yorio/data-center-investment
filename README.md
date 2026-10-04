@@ -80,7 +80,7 @@ With `DEV_LOG_EMAILS=1` and no `EMAIL_API_KEY`, confirmation links are printed t
 
 ## 3D and fallbacks
 
-- Page text and CTAs render first. The 3D chunk (~250 KB gzipped) is requested when the browser goes idle.
+- Page text and CTAs render first. The 3D chunk (~355 KB gzipped) is requested when the browser goes idle.
 - Mobile gets fewer instances, lower DPR and no antialiasing.
 - `prefers-reduced-motion`, no WebGL, or a software-only renderer (SwiftShader / llvmpipe) all get a static intro: the silhouette with the "your share" segment, and the five beats as text.
 - Append `?force3d` to the URL to force WebGL on a software renderer (for testing).
