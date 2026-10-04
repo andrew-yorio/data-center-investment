@@ -34,7 +34,7 @@ A one-page, interest-only site, modeled on a Regulation Crowdfunding "testing th
 
    | Name | Where | Notes |
    |---|---|---|
-   | `VITE_TURNSTILE_SITE_KEY` | Build variables | Public site key, read at build time |
+   | `VITE_TURNSTILE_SITE_KEY` | `.env.production` (committed) | Public site key, read at build time. A build variable of the same name overrides it. |
    | `SUPABASE_URL` | Secret | `https://<project>.supabase.co` |
    | `SUPABASE_SERVICE_ROLE_KEY` | Secret | Never reaches the browser |
    | `TURNSTILE_SECRET_KEY` | Secret | |
@@ -60,7 +60,7 @@ Note that some corporate email security scanners pre-open links, which can confi
 ```bash
 npm install
 cp .dev.vars.example .dev.vars          # local secrets (git-ignored)
-echo 'VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA' > .env.local   # Turnstile always-pass test key
+echo 'VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA' > .env.production.local   # always-pass test key; overrides the real key for local builds
 scripts/localdb/up.sh                   # Postgres + PostgREST in Docker on :54321; prints a service key
 # put SUPABASE_REST_URL=http://localhost:54321 and the printed SERVICE_KEY into .dev.vars
 scripts/dev-api.sh                      # wrangler dev on :8788 (builds first)
