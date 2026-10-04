@@ -1,20 +1,20 @@
-import { PerspectiveCamera } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef } from "react";
-import { BufferAttribute, BufferGeometry, MeshBasicMaterial } from "three";
-import { particleMaterial } from "./materials";
+import { useLayoutEffect, useMemo } from "react";
+import { BufferAttribute, BufferGeometry } from "three";
+import { fadeMaterial, particleMaterial } from "./materials";
 import { ramp } from "./path";
+import { rng } from "./textures";
 
 const SEGMENTS = 8;
 const SHARE = 5;
 
 /**
  * Target points in a normalized frame: the building spans x ∈ [-0.5, 0.5],
- * its walls y ∈ [0, 0.24], rooftop units above. One segment is "your share".
+ * its walls y ∈ [0, 0.24], rooftop units above, the glass annex at the right.
+ * One segment is "your share". Matches the static Silhouette.
  */
 function buildTargets(total: number) {
-  let seed = 23;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const rnd = rng(23);
   const pts: number[] = [];
   const share: number[] = [];
   const H = 0.24;
@@ -30,20 +30,24 @@ function buildTargets(total: number) {
   };
   const budget = (f: number) => Math.round(total * f);
   // Main block outline
-  edge(-0.5, 0, 0.5, 0, budget(0.12));
-  edge(-0.5, H, 0.5, H, budget(0.12));
-  edge(-0.5, 0, -0.5, H, budget(0.035));
-  edge(0.5, 0, 0.5, H, budget(0.035));
+  edge(-0.5, 0, 0.5, 0, budget(0.11));
+  edge(-0.5, H, 0.5, H, budget(0.11));
+  edge(-0.5, 0, -0.5, H, budget(0.03));
+  edge(0.5, 0, 0.5, H, budget(0.03));
   // Rooftop units
   for (let u = 0; u < 6; u++) {
     const x0 = -0.42 + u * 0.15;
     const w = 0.08;
-    edge(x0, H, x0, H + 0.045, budget(0.008));
-    edge(x0 + w, H, x0 + w, H + 0.045, budget(0.008));
-    edge(x0, H + 0.045, x0 + w, H + 0.045, budget(0.014));
+    edge(x0, H, x0, H + 0.045, budget(0.007));
+    edge(x0 + w, H, x0 + w, H + 0.045, budget(0.007));
+    edge(x0, H + 0.045, x0 + w, H + 0.045, budget(0.012));
   }
+  // Glass annex at the right, in front of the block
+  edge(0.26, 0, 0.26, 0.13, budget(0.012));
+  edge(0.26, 0.13, 0.52, 0.13, budget(0.02));
+  edge(0.52, 0, 0.52, 0.13, budget(0.012));
   // Segment dividers
-  for (let s = 1; s < SEGMENTS; s++) edge(-0.5 + s / SEGMENTS, 0, -0.5 + s / SEGMENTS, H, budget(0.02));
+  for (let s = 1; s < SEGMENTS; s++) edge(-0.5 + s / SEGMENTS, 0, -0.5 + s / SEGMENTS, H, budget(0.018));
   // Ground line, wider than the building
   edge(-0.62, -0.004, 0.62, -0.004, budget(0.06));
   // Your share: a filled segment
@@ -53,20 +57,19 @@ function buildTargets(total: number) {
   return { pts: new Float32Array(pts), share: new Float32Array(share) };
 }
 
-export function ValueParticles({ progress, mobile }: { progress: { p: number }; mobile: boolean }) {
+/** Beat 5 overlay, drawn in clip space on top of the 3D scene. */
+export function ValueParticles({ progress, count, mobile }: { progress: { p: number }; count: number; mobile: boolean }) {
   const size = useThree((s) => s.size);
   const dpr = useThree((s) => s.viewport.dpr);
   const mat = useMemo(() => particleMaterial(), []);
-  const fadeMat = useMemo(() => new MeshBasicMaterial({ color: "#07142b", transparent: true, opacity: 0, depthTest: false, depthWrite: false }), []);
+  const fade = useMemo(() => fadeMaterial(), []);
   const geom = useMemo(() => {
-    const count = mobile ? 1800 : 3600;
     const { pts, share } = buildTargets(count);
     const n = share.length;
     const start = new Float32Array(n * 3);
     const delay = new Float32Array(n);
     const seed = new Float32Array(n);
-    let s = 41;
-    const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    const rnd = rng(41);
     for (let i = 0; i < n; i++) {
       // Start as a tight bloom of light where the chip was, at screen center.
       const a = rnd() * Math.PI * 2;
@@ -84,22 +87,22 @@ export function ValueParticles({ progress, mobile }: { progress: { p: number }; 
     g.setAttribute("aDelay", new BufferAttribute(delay, 1));
     g.setAttribute("aSeed", new BufferAttribute(seed, 1));
     return g;
-  }, [mobile]);
-  const points = useRef(null);
+  }, [count]);
 
   // Fit the silhouette to the viewport, leaving room for the headline below it.
   useLayoutEffect(() => {
-    const halfH = Math.tan((45 / 2) * (Math.PI / 180)) * 10;
-    const halfW = halfH * (size.width / size.height);
-    const width = Math.min(8.5, halfW * 2 * 0.84);
-    mat.uniforms.uScale.value = width;
-    mat.uniforms.uOffset.value = [0, size.width < 768 ? halfH * 0.32 : halfH * 0.12];
+    const aspect = size.width / size.height;
+    // Width in NDC units (2 = full width): 84% of the viewport, capped so it never gets huge on wide screens.
+    const widthNdc = Math.min(2 * 0.84, 1.95 / aspect);
+    mat.uniforms.uScale.value = widthNdc * aspect;
+    mat.uniforms.uAspect.value = aspect;
+    mat.uniforms.uOffset.value = [0, size.width < 768 ? 0.32 : 0.12];
     mat.uniforms.uSize.value = (mobile ? 2.4 : 2.8) * dpr;
   }, [size, dpr, mat, mobile]);
 
   useFrame((state) => {
     const p = progress.p;
-    fadeMat.opacity = ramp(p, 0.8, 0.875);
+    fade.uniforms.uOpacity.value = ramp(p, 0.8, 0.875);
     mat.uniforms.uAlpha.value = ramp(p, 0.81, 0.85);
     mat.uniforms.uProg.value = ramp(p, 0.82, 0.985);
     mat.uniforms.uTime.value = state.clock.elapsedTime;
@@ -107,11 +110,10 @@ export function ValueParticles({ progress, mobile }: { progress: { p: number }; 
 
   return (
     <>
-      <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={45} near={0.1} far={100} />
-      <mesh material={fadeMat} renderOrder={1}>
-        <planeGeometry args={[100, 100]} />
+      <mesh material={fade} renderOrder={10} frustumCulled={false}>
+        <planeGeometry args={[2, 2]} />
       </mesh>
-      <points ref={points} geometry={geom} material={mat} renderOrder={2} frustumCulled={false} />
+      <points geometry={geom} material={mat} renderOrder={11} frustumCulled={false} />
     </>
   );
 }
