@@ -18,10 +18,22 @@ export function useMediaQuery(query: string): boolean {
 
 export const usePrefersReducedMotion = () => useMediaQuery("(prefers-reduced-motion: reduce)");
 
+/**
+ * True when a hardware-accelerated WebGL context is available. Software
+ * renderers (SwiftShader, llvmpipe) draw the scene on the CPU and make the page
+ * janky, so those visitors get the static fallback. `?force3d` overrides this
+ * for testing.
+ */
 export function webglAvailable(): boolean {
   try {
     const canvas = document.createElement("canvas");
-    return !!(canvas.getContext("webgl2") ?? canvas.getContext("webgl"));
+    const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    if (!gl) return false;
+    if (new URLSearchParams(window.location.search).has("force3d")) return true;
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return !/swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer);
   } catch {
     return false;
   }

@@ -14,7 +14,7 @@ for (const width of [1440, 768, 375]) {
   const page = await browser.newPage({ viewport: { width, height }, reducedMotion: reduced ? "reduce" : "no-preference" });
   page.on("console", (m) => m.type() === "error" && console.log(`[${width}] console error: ${m.text()}`));
   page.on("pageerror", (e) => console.log(`[${width}] page error: ${e.message}`));
-  await page.goto(base, { waitUntil: "networkidle" });
+  await page.goto(`${base}/?force3d`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
   const tag = reduced ? `${width}-reduced` : `${width}`;
   if (introOnly) {
@@ -24,7 +24,7 @@ for (const width of [1440, 768, 375]) {
     });
     for (const p of [0, 0.1, 0.2, 0.3, 0.5, 0.66, 0.78, 0.9, 1]) {
       await page.evaluate((y) => window.scrollTo(0, y), track.top + (track.h - height) * p);
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(2000);
       await page.screenshot({ path: `${out}/${tag}-intro-${String(p).replace(".", "")}.png` });
     }
   } else {
