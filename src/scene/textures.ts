@@ -769,24 +769,26 @@ export function pcbMaps(res = 1024): MapSet {
 /** CPU package substrate: dark green laminate with a dense grid of tiny pads near the edge. */
 export function substrateMaps(res = 512): MapSet {
   return mapSet(res, res, (a, h, o) => {
-    a.fillStyle = "#143a2f";
+    a.fillStyle = "#0e2e24";
     a.fillRect(0, 0, res, res);
     fbm(a, res, res, 181, [[64, 0.08]], "overlay");
-    o.fillStyle = orm(1, 0.45, 0);
+    o.fillStyle = orm(1, 0.4, 0);
     o.fillRect(0, 0, res, res);
-    const pitch = res / 64;
+    // Tiny surface pads: sparse, dull, under the soldermask tint.
+    const pitch = res / 80;
+    const pr = rng(182);
     for (let y = pitch; y < res - pitch / 2; y += pitch) for (let x = pitch; x < res - pitch / 2; x += pitch) {
       const inner = Math.abs(x - res / 2) < res * 0.26 && Math.abs(y - res / 2) < res * 0.26;
-      if (inner) continue;
-      a.fillStyle = "#9ea4ad";
-      a.fillRect(x - 1.5, y - 1.5, 3, 3);
-      o.fillStyle = orm(1, 0.3, 1);
-      o.fillRect(x - 1.5, y - 1.5, 3, 3);
-      h.fillStyle = grey(170);
-      h.fillRect(x - 1.5, y - 1.5, 3, 3);
+      if (inner || pr() < 0.45) continue;
+      a.fillStyle = "#4f6a62";
+      a.fillRect(x - 1, y - 1, 2, 2);
+      o.fillStyle = orm(1, 0.35, 0.6);
+      o.fillRect(x - 1, y - 1, 2, 2);
+      h.fillStyle = grey(150);
+      h.fillRect(x - 1, y - 1, 2, 2);
     }
     // Fine traces fanning from the die area.
-    a.strokeStyle = "rgba(170,180,190,0.35)";
+    a.strokeStyle = "rgba(110,150,135,0.5)";
     a.lineWidth = 1;
     const r = rng(183);
     for (let i = 0; i < 200; i++) {
@@ -939,16 +941,16 @@ export function dieMaps(res = 2048): DieMaps {
       const logicW = coreW - l2w - 8 * s;
       const l2x = col === 0 ? x + coreW - l2w : x;
       const lx = col === 0 ? x : x + l2w + 8 * s;
-      block(l2x, y, l2w, coreH, "#3f5e6c", 0.14, 0.95, "sram");
-      block(lx, y, logicW, coreH * 0.62, "#4a4a66", 0.32, 0.5, "logic");
-      block(lx, y + coreH * 0.66, logicW * 0.48, coreH * 0.34, "#3d5c6a", 0.16, 0.9, "sram");
-      block(lx + logicW * 0.52, y + coreH * 0.66, logicW * 0.48, coreH * 0.34, "#4b4f6a", 0.3, 0.55, "logic");
+      block(l2x, y, l2w, coreH, "#4e7384", 0.14, 0.95, "sram");
+      block(lx, y, logicW, coreH * 0.62, "#5a5a7c", 0.32, 0.5, "logic");
+      block(lx, y + coreH * 0.66, logicW * 0.48, coreH * 0.34, "#4b7080", 0.16, 0.9, "sram");
+      block(lx + logicW * 0.52, y + coreH * 0.66, logicW * 0.48, coreH * 0.34, "#5b6080", 0.3, 0.55, "logic");
     }
     // Cache spine: L3 slices and the ring bus.
     const sx = x0 + coreW + 12 * s;
     for (let row = 0; row < 8; row++) {
       const y = y0 + (row * coreArea) / 8;
-      block(sx, y + 4 * s, spine, coreArea / 8 - 8 * s, "#50606f", 0.18, 0.8, "cache");
+      block(sx, y + 4 * s, spine, coreArea / 8 - 8 * s, "#647789", 0.18, 0.8, "cache");
     }
     a.fillStyle = "rgba(220,230,245,0.35)";
     for (let k = 0; k < 6; k++) a.fillRect(sx + spine * 0.2 + k * spine * 0.1, y0, 1.5 * s, coreArea);

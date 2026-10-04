@@ -16,7 +16,7 @@ const ROW_MID = (RACK.zStart + RACK.zEnd) / 2;
 const U = 0.04445;
 const RACK_BASE = 0.1;
 const AISLE_W = ROW_PITCH - RACK.depth; // 2.3 m between back-to-back or face-to-face rows
-const STRIP = new Color("#dbe6ff").multiplyScalar(4.5); // HDR fixture emissive
+const STRIP = new Color("#dbe6ff").multiplyScalar(3.5); // HDR fixture emissive
 
 function tiled(set: MapSet, rx: number, ry: number): MapSet {
   const clone = (t: Texture) => {
