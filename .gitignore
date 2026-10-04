@@ -1,0 +1,11 @@
+node_modules
+dist
+.wrangler
+.dev.vars
+.env
+.env.local
+test-results
+playwright-report
+reports
+*.log
+scripts/localdb/10-schema.sql
