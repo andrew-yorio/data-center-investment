@@ -102,7 +102,7 @@ export default function Scene({ mobile, active }: { mobile: boolean; active: boo
       className="!absolute inset-0"
       frameloop={active ? "always" : "never"}
       dpr={dpr}
-      shadows={q.shadows}
+      shadows={q.shadows ? "percentage" : false}
       gl={{ antialias: false, powerPreference: "high-performance", stencil: false, toneMappingExposure: 1.0 }}
       camera={{ fov: mobile ? 55 : 42, position: [62, 24, 96], near: 0.1, far: 2000 }}
     >

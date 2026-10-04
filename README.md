@@ -77,11 +77,13 @@ With `DEV_LOG_EMAILS=1` and no `EMAIL_API_KEY`, confirmation links are printed t
 | `npm test` | Unit tests for the API handlers and flag heuristics |
 | `npm run test:e2e` | Playwright against :8788. Sign-up → DB row with IP → confirm link → duplicate, inline validation, hard-rules copy check, axe (WCAG 2.1 AA). Needs the local DB and dev server running. |
 | `node scripts/shots.ts http://localhost:8788 reports/shots [--intro] [--reduced]` | Screenshots at 1440 / 768 / 375 |
+| `node scripts/shots-slow.ts <url> <dir> --intro` | Same, but waits for frames instead of time (headless Chrome renders the 3D scene on a software GPU at well under 1 fps). `WIDTHS=1440 POSITIONS=0,0.5` narrow the run. |
 
 ## 3D and fallbacks
 
-- Page text and CTAs render first. The 3D chunk (~250 KB gzipped) is requested when the browser goes idle.
-- Mobile gets fewer instances, lower DPR and no antialiasing.
+- Page text and CTAs render first. The 3D chunk (~355 KB gzipped, including post-processing) is requested when the browser goes idle. Every texture and environment map is painted on a canvas at runtime; nothing is downloaded.
+- The scene renders in HDR with selective bloom, AgX tone mapping, SMAA, vignette and grain. Desktop adds planar reflections (wet pavement, hall floor), a moonlight shadow map and depth of field in the macro beat.
+- Tiers live in `src/scene/quality.ts`. Mobile gets fewer rack rows and LEDs, lower DPR, MSAA instead of SMAA, and no reflections, shadows or depth of field. drei's `PerformanceMonitor` lowers DPR under load and, on a sustained drop, switches to the degraded tier (which also drops reflections, shadows and DoF). `?force3d` pins the full tier so test shots are comparable.
 - `prefers-reduced-motion`, no WebGL, or a software-only renderer (SwiftShader / llvmpipe) all get a static intro: the silhouette with the "your share" segment, and the five beats as text.
 - Append `?force3d` to the URL to force WebGL on a software renderer (for testing).
 - The canvas stops rendering once the intro scrolls out of view.

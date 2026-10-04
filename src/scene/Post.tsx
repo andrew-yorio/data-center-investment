@@ -13,16 +13,19 @@ import type { Quality } from "./quality";
  */
 export function Post({ q, macro, focus, state }: { q: Quality; macro: boolean; focus: Vector3; state: { dist: number } }) {
   const dof = useRef<DepthOfFieldEffect>(null);
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const e = dof.current;
     if (!e) return;
+    // The rig moves the clipping planes every frame; the CoC material copies them by value, so refresh it.
+    e.cocMaterial.adoptCameraSettings(camera);
     // Keep the die sharp and let the board fall off; range scales with the macro distance.
-    e.cocMaterial.focusRange = Math.max(0.004, state.dist * 0.6);
-    e.bokehScale = 2.6;
+    e.cocMaterial.focusDistance = state.dist;
+    e.cocMaterial.focusRange = Math.max(0.006, state.dist * 1.3);
+    e.bokehScale = 2.0;
   });
   return (
     <EffectComposer multisampling={q.mobile ? 4 : 0} frameBufferType={HalfFloatType} enableNormalPass={false}>
-      <Bloom mipmapBlur intensity={q.mobile ? 0.7 : 0.85} luminanceThreshold={1} luminanceSmoothing={0.25} levels={q.mobile ? 5 : 7} resolutionScale={q.mobile ? 0.5 : 1} />
+      <Bloom mipmapBlur intensity={q.mobile ? 0.6 : 0.7} luminanceThreshold={1} luminanceSmoothing={0.25} levels={q.mobile ? 5 : 7} resolutionScale={q.mobile ? 0.5 : 1} />
       {q.dof && macro ? <DepthOfField ref={dof} target={focus} focusRange={0.01} bokehScale={2.6} resolutionScale={0.5} /> : <></>}
       <ToneMapping mode={ToneMappingMode.AGX} />
       <Vignette offset={0.32} darkness={0.55} eskil={false} />

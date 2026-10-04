@@ -63,7 +63,7 @@ export function Server({ q, progress }: { q: Quality; progress: { p: number } })
       metalness: 1,
       emissive: RACK_BLUE,
       emissiveIntensity: 0,
-      envMapIntensity: 1.4,
+      envMapIntensity: 2.0,
     });
     if (!q.mobile) {
       dieMat.iridescence = 0.55;
@@ -92,6 +92,7 @@ export function Server({ q, progress }: { q: Quality; progress: { p: number } })
       fanFrame: new MeshStandardMaterial({ color: "#0d0e11", roughness: 0.7 }),
       blade: new MeshStandardMaterial({ color: "#2b2f36", roughness: 0.5, metalness: 0.3 }),
       driveLed: new MeshStandardMaterial({ color: "#0a1a12", emissive: new Color("#58e6a8").multiplyScalar(3), roughness: 0.4 }),
+      boardLed: new MeshStandardMaterial({ color: "#0a1220", emissive: new Color("#5aa8ff").multiplyScalar(3), roughness: 0.4 }),
     };
   }, [q.dieRes, q.mobile]);
 
@@ -170,12 +171,12 @@ export function Server({ q, progress }: { q: Quality; progress: { p: number } })
       blades.current.instanceMatrix.needsUpdate = true;
     }
     // Die: activation sweep, then a steady glow; the macro key light comes up with it.
-    const act = ramp(p, 0.6, 0.8);
+    const act = ramp(p, 0.66, 0.84);
     tex.activation.uProg.value = act;
     tex.activation.uTime.value = t;
-    tex.die.emissiveIntensity = 0.4 + act * 2.6;
+    tex.die.emissiveIntensity = 0.05 + act * 1.2;
     if (dieLight.current) dieLight.current.intensity = 0.02 * ramp(p, 0.56, 0.68);
-    if (workLight.current) workLight.current.intensity = 5 * ramp(p, 0.36, 0.44);
+    if (workLight.current) workLight.current.intensity = 16 * ramp(p, 0.36, 0.44);
   });
 
   return (
@@ -252,6 +253,12 @@ export function Server({ q, progress }: { q: Quality; progress: { p: number } })
       <instancedMesh ref={vrmFins} args={[undefined, undefined, 20]} material={tex.alu}>
         <boxGeometry />
       </instancedMesh>
+      {/* Board status LEDs near the rear edge. */}
+      {[0, 1, 2, 3, 4].map((i) => (
+        <mesh key={i} position={[-0.06, BOARD_TOP + 0.002, -0.19 + i * 0.012]} material={i % 2 ? tex.driveLed : tex.boardLed}>
+          <boxGeometry args={[0.002, 0.002, 0.0012]} />
+        </mesh>
+      ))}
       {/* Riser card and cabling. */}
       <mesh position={[0.05, BOARD_TOP + 0.04, 0.17]} material={tex.pcb}>
         <boxGeometry args={[0.17, 0.075, 0.0016]} />
@@ -315,7 +322,7 @@ export function Server({ q, progress }: { q: Quality; progress: { p: number } })
       </instancedMesh>
 
       {/* Lights: a tech's work light over the open server, and a macro key light for the die's specular. */}
-      <pointLight ref={workLight} position={[0.35, 1.2, 0.1]} color="#e3ecff" intensity={0} distance={4} decay={2} />
+      <pointLight ref={workLight} position={[0.3, 0.75, 0.15]} color="#e3ecff" intensity={0} distance={4} decay={2} />
       <pointLight ref={dieLight} position={[CPU_LX + 0.03, BOARD_TOP + 0.07, CPU1_LZ - 0.025]} color="#ffffff" intensity={0} distance={0.4} decay={2} />
     </group>
   );

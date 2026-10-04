@@ -2,7 +2,7 @@ import { MeshReflectorMaterial } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, type Group, InstancedBufferAttribute, type InstancedMesh, MeshStandardMaterial, Object3D, type Points, type Texture } from "three";
-import { BUILDING, HALL_CEILING, RACK, RACK_FRONT_X, ROW_PITCH, ROW_X, TARGET_Z, ramp } from "./path";
+import { BUILDING, HALL_CEILING, HALL_DOOR, LOBBY, RACK, RACK_FRONT_X, ROW_PITCH, ROW_X, TARGET_Z, ramp } from "./path";
 import type { Quality } from "./quality";
 import { ceilingMaps, dotTexture, floorTileMaps, graphiteMaps, type MapSet, rackDoorMaps, rng, wallPanelMaps } from "./textures";
 import { ledMaterial, type LedMaterial } from "./materials";
@@ -16,7 +16,7 @@ const ROW_MID = (RACK.zStart + RACK.zEnd) / 2;
 const U = 0.04445;
 const RACK_BASE = 0.1;
 const AISLE_W = ROW_PITCH - RACK.depth; // 2.3 m between back-to-back or face-to-face rows
-const STRIP = new Color("#dbe6ff").multiplyScalar(6); // HDR fixture emissive
+const STRIP = new Color("#dbe6ff").multiplyScalar(4.5); // HDR fixture emissive
 
 function tiled(set: MapSet, rx: number, ry: number): MapSet {
   const clone = (t: Texture) => {
@@ -273,7 +273,7 @@ export function Hall({ q, reflections, progress }: { q: Quality; reflections: bo
           arr[i + 2] += Math.sin(t * 0.6 + i * 0.7) * 0.01 * dt;
         }
         a.needsUpdate = true;
-        (m.material as { opacity: number }).opacity = 0.5 * ramp(p, 0.3, 0.38) * (1 - ramp(p, 0.6, 0.68));
+        (m.material as { opacity: number }).opacity = 0.25 * ramp(p, 0.3, 0.38) * (1 - ramp(p, 0.6, 0.68));
       }
     }
   });
@@ -319,9 +319,40 @@ export function Hall({ q, reflections, progress }: { q: Quality; reflections: bo
       <mesh position={[0, HALL_CEILING / 2, -INNER_D / 2]} material={tex.wallLong}>
         <planeGeometry args={[INNER_W, HALL_CEILING]} />
       </mesh>
-      <mesh position={[0, HALL_CEILING / 2, INNER_D / 2]} rotation-y={Math.PI} material={tex.wallLong}>
-        <planeGeometry args={[INNER_W, HALL_CEILING]} />
+      {/* Front wall of the hall, with the double doorway the camera comes through. */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (INNER_W / 4 + HALL_DOOR.w / 4), HALL_CEILING / 2, LOBBY.z0]} rotation-y={Math.PI} material={tex.wallLong}>
+          <planeGeometry args={[INNER_W / 2 - HALL_DOOR.w / 2, HALL_CEILING]} />
+        </mesh>
+      ))}
+      <mesh position={[0, (HALL_CEILING + HALL_DOOR.h) / 2, LOBBY.z0]} rotation-y={Math.PI} material={tex.wallLong}>
+        <planeGeometry args={[HALL_DOOR.w, HALL_CEILING - HALL_DOOR.h]} />
       </mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (HALL_DOOR.w / 2 + 0.04), HALL_DOOR.h / 2, LOBBY.z0]} material={tex.steel}>
+          <boxGeometry args={[0.08, HALL_DOOR.h, 0.2]} />
+        </mesh>
+      ))}
+      <mesh position={[0, HALL_DOOR.h + 0.04, LOBBY.z0]} material={tex.steel}>
+        <boxGeometry args={[HALL_DOOR.w + 0.16, 0.08, 0.2]} />
+      </mesh>
+
+      {/* Lobby between the glass doors and the hall: side walls, low ceiling with a fixture, a reception desk. */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * LOBBY.halfW, LOBBY.h / 2, (LOBBY.z0 + LOBBY.z1) / 2]} rotation-y={(-s * Math.PI) / 2} material={tex.wallShort}>
+          <planeGeometry args={[LOBBY.z1 - LOBBY.z0, LOBBY.h]} />
+        </mesh>
+      ))}
+      <mesh position={[0, LOBBY.h, (LOBBY.z0 + LOBBY.z1) / 2]} rotation-x={Math.PI / 2} material={tex.ceiling}>
+        <planeGeometry args={[LOBBY.halfW * 2, LOBBY.z1 - LOBBY.z0]} />
+      </mesh>
+      <mesh position={[0, LOBBY.h - 0.03, (LOBBY.z0 + LOBBY.z1) / 2]} material={tex.fixture}>
+        <boxGeometry args={[2.4, 0.04, 0.3]} />
+      </mesh>
+      <mesh position={[2.6, 0.55, LOBBY.z0 + 1.2]} material={tex.darkSteel}>
+        <boxGeometry args={[2.4, 1.1, 0.7]} />
+      </mesh>
+      <pointLight position={[0, LOBBY.h - 0.3, (LOBBY.z0 + LOBBY.z1) / 2]} color="#e6edf8" intensity={9} distance={9} decay={2} />
       <mesh position={[-INNER_W / 2, HALL_CEILING / 2, 0]} rotation-y={Math.PI / 2} material={tex.wallShort}>
         <planeGeometry args={[INNER_D, HALL_CEILING]} />
       </mesh>
@@ -396,13 +427,13 @@ export function Hall({ q, reflections, progress }: { q: Quality; reflections: bo
       <hemisphereLight args={["#2a3550", "#0a0c10", 0.35]} />
       {Array.from({ length: q.aisleLights }, (_, i) => {
         const z = RACK.zStart - 1 + ((RACK.zEnd - RACK.zStart + 2) * i) / Math.max(1, q.aisleLights - 1);
-        return <pointLight key={i} position={[0, HALL_CEILING - 0.4, z]} color="#d6e4ff" intensity={28} distance={16} decay={2} />;
+        return <pointLight key={i} position={[0, HALL_CEILING - 0.4, z]} color="#d6e4ff" intensity={22} distance={16} decay={2} />;
       })}
       {!q.mobile && <pointLight position={[-(ROW_X + 1.5 * ROW_PITCH), HALL_CEILING - 0.4, 0]} color="#d6e4ff" intensity={20} distance={14} decay={2} />}
       {!q.mobile && <pointLight position={[ROW_X + 1.5 * ROW_PITCH, HALL_CEILING - 0.4, 0]} color="#d6e4ff" intensity={20} distance={14} decay={2} />}
 
       <points ref={motes} geometry={moteGeom} frustumCulled={false}>
-        <pointsMaterial map={tex.dot} color={new Color("#9fc4ff").multiplyScalar(1.4)} size={0.006} sizeAttenuation transparent opacity={0} depthWrite={false} blending={AdditiveBlending} />
+        <pointsMaterial map={tex.dot} color="#9fc4ff" size={0.0025} sizeAttenuation transparent opacity={0} depthWrite={false} blending={AdditiveBlending} />
       </points>
 
       <Server q={q} progress={progress} />

@@ -27,6 +27,10 @@ export const BUILDING = { w: 60, h: 14, d: 36 } as const;
 /** Glass office annex at the building's front-right corner. */
 export const ANNEX = { w: 18, h: 7.2, d: 10, x: BUILDING.w / 2 - 9, z: BUILDING.d / 2 + 5 } as const;
 export const HALL_CEILING = 5.0;
+/** Entrance: glass doors in the facade, a small lobby, then double doors into the hall. */
+export const DOOR = { w: 4.2, h: 3.1 } as const;
+export const LOBBY = { halfW: 4.5, h: 3.4, z0: 15.3, z1: BUILDING.d / 2 } as const; // hall front wall sits at z0
+export const HALL_DOOR = { w: 3.0, h: 3.0 } as const;
 
 interface Key {
   p: number;

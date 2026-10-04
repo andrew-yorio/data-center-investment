@@ -148,7 +148,7 @@ function mapSet(w: number, h: number, draw: (albedo: Ctx, height: Ctx, orm: Ctx)
 export function facadeMaps(res = 512): MapSet {
   return mapSet(res, res, (a, h, o) => {
     const s = res / 512;
-    a.fillStyle = "#7b7f87";
+    a.fillStyle = "#686c74";
     a.fillRect(0, 0, res, res);
     fbm(a, res, res, 3, [[8, 0.25], [32, 0.2], [128, 0.15]], "multiply");
     fbm(a, res, res, 9, [[64, 0.1]], "screen");
@@ -325,18 +325,19 @@ export function officeGlassTexture(res = 512): CanvasTexture {
     grd.addColorStop(0, "#c9d6e6");
     grd.addColorStop(0.35, "#8ea0b8");
     grd.addColorStop(1, "#3b4a60");
-    for (let bay = 0; bay < 6; bay++) {
-      const bx = (bay * res) / 6;
-      const lit = r() > 0.22;
+    for (let bay = 0; bay < 8; bay++) {
+      const bx = (bay * res) / 8;
+      const lit = r() > 0.2;
       g.fillStyle = lit ? grd : "#111821";
-      g.fillRect(bx, y0 + slab, res / 6, fh - slab);
+      g.fillRect(bx, y0 + slab, res / 8, fh - slab);
       if (lit) {
-        // Ceiling fixtures and desk silhouettes.
+        // Ceiling fixtures, a monitor glow and a low desk line.
         g.fillStyle = "#f4f8ff";
-        g.fillRect(bx + res / 36, y0 + slab + 2, res / 12, 3);
-        g.fillStyle = "rgba(10,14,22,0.75)";
-        g.fillRect(bx + res / 30, y0 + fh * 0.62, res / 10, fh * 0.07);
-        g.fillRect(bx + res / 9, y0 + fh * 0.5, res / 40, fh * 0.5);
+        g.fillRect(bx + res / 40, y0 + slab + 2, res / 14, 2);
+        g.fillStyle = "rgba(10,14,22,0.55)";
+        g.fillRect(bx + res / 48, y0 + fh * 0.7, res / 10, fh * 0.03);
+        g.fillStyle = "rgba(190,215,255,0.5)";
+        g.fillRect(bx + res / 20, y0 + fh * 0.58, res / 60, fh * 0.07);
       }
     }
     // Floor slab, dark.
@@ -345,7 +346,7 @@ export function officeGlassTexture(res = 512): CanvasTexture {
   }
   // Mullions.
   g.fillStyle = "#05070b";
-  for (let x = 0; x <= res; x += res / 12) g.fillRect(x - 2, 0, 4, res);
+  for (let x = 0; x <= res; x += res / 16) g.fillRect(x - 1, 0, 2, res);
   return toTexture(c, true);
 }
 
@@ -674,7 +675,7 @@ export function serverStackMaps(openSlotU: [number, number], w = 512, h = 2048):
 /** Server motherboard, ~0.43 x 0.5 m: dark green soldermask, trace bundles, vias, pads, silkscreen. */
 export function pcbMaps(res = 1024): MapSet {
   return mapSet(res, res, (a, h, o) => {
-    a.fillStyle = "#0f3b2d";
+    a.fillStyle = "#17503d";
     a.fillRect(0, 0, res, res);
     fbm(a, res, res, 171, [[64, 0.08]], "overlay");
     o.fillStyle = orm(1, 0.55, 0);
@@ -821,7 +822,7 @@ export function dieMaps(res = 2048): DieMaps {
   const set = mapSet(res, res, (a, h, o) => {
     const s = res / 2048;
     // Base: dark metal stack, faint metal fill grid.
-    a.fillStyle = "#2a3140";
+    a.fillStyle = "#1f2530";
     a.fillRect(0, 0, res, res);
     fbm(a, res, res, 201, [[64, 0.08], [1024, 0.12]], "overlay");
     o.fillStyle = orm(1, 0.28, 0.9);
@@ -914,13 +915,13 @@ export function dieMaps(res = 2048): DieMaps {
       block(res - margin - ring + 2 * s, p + 2 * s, ring - 8 * s, phyLen - 4 * s, tone, 0.3, 0.7, "phy");
     }
     // Bump pads in the ring (regular grid of dull metal dots).
-    a.fillStyle = "rgba(205,212,222,0.55)";
+    a.fillStyle = "rgba(205,212,222,0.4)";
     const bp = 12 * s;
     for (let y = margin + bp; y < res - margin; y += bp) for (let x = margin + bp; x < res - margin; x += bp) {
       const inRing = x < inner || x > res - inner || y < inner || y > res - inner;
       if (!inRing) continue;
       a.beginPath();
-      a.arc(x, y, 2.2 * s, 0, Math.PI * 2);
+      a.arc(x, y, 1.3 * s, 0, Math.PI * 2);
       a.fill();
     }
     // Core grid: 2 columns x 4 rows, with a cache spine in the middle.
@@ -955,7 +956,7 @@ export function dieMaps(res = 2048): DieMaps {
     a.fillStyle = "#b8c2d4";
     a.fillRect(margin + 10 * s, margin + 10 * s, 20 * s, 4 * s);
     a.fillRect(margin + 10 * s, margin + 10 * s, 4 * s, 20 * s);
-  }, { normalStrength: 1, repeat: false });
+  }, { normalStrength: 1.5, repeat: false });
   const activation = toTexture(act, false, false);
   activation.minFilter = LinearFilter;
   activation.generateMipmaps = false;

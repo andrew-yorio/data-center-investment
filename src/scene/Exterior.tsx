@@ -1,8 +1,8 @@
 import { MeshReflectorMaterial, Stars } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { AdditiveBlending, Color, type DirectionalLight, DoubleSide, type Group, type InstancedMesh, MeshStandardMaterial, Object3D, type Texture } from "three";
-import { ANNEX, BUILDING, ramp } from "./path";
+import { AdditiveBlending, Color, type DirectionalLight, DoubleSide, type Group, type InstancedMesh, MeshStandardMaterial, Object3D, Path, Shape, ShapeGeometry, type Texture } from "three";
+import { ANNEX, BUILDING, DOOR, ramp } from "./path";
 import type { Quality } from "./quality";
 import { chainlinkTexture, facadeMaps, glowTexture, louvreMaps, type MapSet, officeGlassTexture, paintedMetalMaps, pavementMaps, roofMaps } from "./textures";
 import { lightConeMaterial, skyMaterial } from "./materials";
@@ -66,6 +66,8 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
     const roof = roofMaps(256);
     return {
       facadeFront: pbr(tiled(facade, W / 6, H / 7)),
+      // The front facade is a shape with the door opening cut out; ShapeGeometry UVs are in metres.
+      facadeFrontCut: pbr(tiled(facade, 1 / 6, 1 / 7)),
       facadeSide: pbr(tiled(facade, D / 6, H / 7)),
       roof: pbr(tiled(roof, W / 2, D / 2)),
       concrete: tiled(concrete, 150 / 14, 110 / 14),
@@ -79,6 +81,23 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
       chainlink: chainlinkTexture(128),
       glow: glowTexture(256, 1.8),
     };
+  }, []);
+
+  const frontGeom = useMemo(() => {
+    const shape = new Shape();
+    shape.moveTo(-W / 2, 0);
+    shape.lineTo(W / 2, 0);
+    shape.lineTo(W / 2, H);
+    shape.lineTo(-W / 2, H);
+    shape.closePath();
+    const hole = new Path();
+    hole.moveTo(-DOOR.w / 2, 0);
+    hole.lineTo(DOOR.w / 2, 0);
+    hole.lineTo(DOOR.w / 2, DOOR.h);
+    hole.lineTo(-DOOR.w / 2, DOOR.h);
+    hole.closePath();
+    shape.holes.push(hole);
+    return new ShapeGeometry(shape);
   }, []);
 
   // Chillers: 3 rows x 5 units on the roof, each with 4 fans.
@@ -237,6 +256,10 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
       {POLES.slice(0, q.poleLights).map(([x, z], i) => (
         <pointLight key={i} position={[x, 8.8, z - 0.9]} color="#dfeaff" intensity={260} distance={46} decay={2} />
       ))}
+      {/* Wall-washers along the base of the front facade, and the entrance. */}
+      {Array.from({ length: q.mobile ? 2 : 5 }, (_, i) => (
+        <pointLight key={`wash${i}`} position={[-24 + i * (48 / Math.max(1, (q.mobile ? 2 : 5) - 1)), 0.6, D / 2 + 1.2]} color="#c9d8f2" intensity={28} distance={16} decay={2} />
+      ))}
       {/* Office annex spill and entrance light. */}
       <pointLight position={[ANNEX.x, 4, ANNEX.z + ANNEX.d / 2 + 2]} color="#cfdcf0" intensity={60} distance={24} decay={2} />
 
@@ -286,9 +309,7 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
       </mesh>
 
       {/* Main block: precast facade, roof, parapet. */}
-      <mesh position={[0, H / 2, D / 2]} material={tex.facadeFront} castShadow receiveShadow>
-        <planeGeometry args={[W, H]} />
-      </mesh>
+      <mesh position={[0, 0, D / 2]} geometry={frontGeom} material={tex.facadeFrontCut} castShadow receiveShadow />
       <mesh position={[0, H / 2, -D / 2]} rotation-y={Math.PI} material={tex.facadeFront} castShadow receiveShadow>
         <planeGeometry args={[W, H]} />
       </mesh>
@@ -311,9 +332,19 @@ export function Exterior({ q, reflections, progress }: { q: Quality; reflections
       <mesh position={[0, 3.6, D / 2 + 1.4]} material={tex.steelDark} castShadow>
         <boxGeometry args={[9, 0.35, 3]} />
       </mesh>
-      <mesh position={[0, 1.6, D / 2 + 0.03]}>
-        <planeGeometry args={[4.2, 3.1]} />
-        <meshStandardMaterial color="#1a2230" emissive={new Color("#cfe0ff")} emissiveIntensity={1.2} roughness={0.1} metalness={0.3} />
+      {/* Glass entrance doors: tinted, reflective, with the lit lobby visible behind. */}
+      <mesh position={[0, DOOR.h / 2, D / 2 + 0.02]}>
+        <planeGeometry args={[DOOR.w, DOOR.h]} />
+        <meshStandardMaterial color="#0b1118" transparent opacity={0.45} roughness={0.04} metalness={0.7} envMapIntensity={1.5} depthWrite={false} />
+      </mesh>
+      {[[-DOOR.w / 2, DOOR.h / 2, 0.08, DOOR.h], [DOOR.w / 2, DOOR.h / 2, 0.08, DOOR.h], [0, DOOR.h / 2, 0.05, DOOR.h], [0, DOOR.h, DOOR.w, 0.1]].map(([x, y, sx, sy], i) => (
+        <mesh key={i} position={[x, y, D / 2 + 0.04]} material={tex.steelDark}>
+          <boxGeometry args={[sx, sy, 0.08]} />
+        </mesh>
+      ))}
+      <mesh position={[0, 3.45, D / 2 + 1.4]}>
+        <planeGeometry args={[7, 2.4]} />
+        <meshStandardMaterial color="#1a1d22" emissive={new Color("#dfe8f6")} emissiveIntensity={0.9} roughness={0.8} side={DoubleSide} />
       </mesh>
       <instancedMesh ref={louvres} args={[undefined, undefined, 40]} material={tex.louvre}>
         <planeGeometry />
