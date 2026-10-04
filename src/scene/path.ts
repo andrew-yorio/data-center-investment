@@ -48,8 +48,8 @@ interface Key {
  */
 const F = FLOOR_Y;
 const KEYS: Key[] = [
-  { p: 0.0, pos: [52, 17, 78], target: [0, 3, 0] },
-  { p: 0.12, pos: [12, 5, 40], target: [0, 2.5, 9] },
+  { p: 0.0, pos: [36, 11, 54], target: [0, 2.5, 2] },
+  { p: 0.12, pos: [9, 4.5, 34], target: [0, 2.5, 9] },
   { p: 0.2, pos: [0, 1.75 + F, MODULE.len / 2 + 1.6], target: [0, 1.6 + F, -6] },
   { p: 0.3, pos: [0, 1.7 + F, 3.5], target: [0, 1.5 + F, -9] },
   { p: 0.42, pos: [0.35, 1.7 + F, TARGET_Z + 3.0], target: [RACK_FRONT_X, 1.3 + F, TARGET_Z] },

@@ -293,7 +293,7 @@ export function Hall({ q, reflections, progress }: { q: Quality; reflections: bo
       <mesh position={[0, 2.76, SPINE_Z]} material={tex.fixture}>
         <boxGeometry args={[0.1, 0.03, 2.4]} />
       </mesh>
-      <pointLight position={[0, 2.4, SPINE_Z]} color="#e6edf8" intensity={6} distance={7} decay={2} />
+      <pointLight position={[0, 2.4, SPINE_Z]} color="#e6edf8" intensity={3} distance={7} decay={2} />
 
       {/* Racks and chimney containment from rack top to ceiling. */}
       <instancedMesh ref={bodies} args={[undefined, undefined, rackCount]} material={tex.graphite}>

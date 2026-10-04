@@ -167,7 +167,7 @@ function useExteriorMaterials() {
       steel: pbr(tiled(steel, 1, 1)),
       steelDark: pbr(tiled(steel, 1, 1), { color: new Color("#4a5059") }),
       door: new MeshStandardMaterial({ color: "#2b3038", roughness: 0.5, metalness: 0.6 }),
-      lamp: new MeshStandardMaterial({ color: "#20242a", emissive: LAMP, emissiveIntensity: 0.6, roughness: 0.5, metalness: 0.4 }),
+      lamp: new MeshStandardMaterial({ color: "#20242a", emissive: LAMP, emissiveIntensity: 1, roughness: 0.5, metalness: 0.4 }),
       office: officeGlassTexture(512),
       chainlink: chainlinkTexture(128),
       glow: glowTexture(256, 1.8),
