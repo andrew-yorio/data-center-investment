@@ -66,7 +66,7 @@
     outline-color: #fff;
   }
   ::selection {
-    background: var(--color-share-400);
+    background: #cfe0ff;
     color: var(--color-ink);
   }
 }

@@ -24,7 +24,7 @@ The brief asks for two passes before any code: first a compact token plan, then 
 
 ### Color: two grounds, and an accent that means something
 
-Amber is **reserved for "your share"**. It is the glowing segment of the building in beat 5, and the selected investment range in the form. It never decorates. CTAs use ink and paper instead.
+Amber is **reserved for "your share"**. It is the glowing segment of the building in beat 5 and in the static silhouette, and `share-700` marks the "you're on the list" confirmation. It never decorates. CTAs use ink and paper instead.
 
 | Token | Value | Use |
 |---|---|---|
