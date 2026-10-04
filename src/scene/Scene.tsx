@@ -3,6 +3,7 @@ import { PerformanceMonitor } from "@react-three/drei";
 import { useLayoutEffect, useMemo, useState } from "react";
 import { Color, FogExp2, MathUtils, PerspectiveCamera as PCam, Vector3 } from "three";
 import { introScroll } from "../lib/scroll";
+import { BEATS, beatAt } from "../lib/motion";
 import { cameraUp, ramp, sampleCamera } from "./path";
 import { quality } from "./quality";
 import { makeEnvironments } from "./env";
@@ -17,6 +18,17 @@ const HAZE_IN = new Color("#0a0f18");
 
 /** Shared, smoothed progress so every part of the scene agrees on the same frame. */
 const frame = { p: 0 };
+
+/**
+ * Stepped scrubbing: each beat has a hero stop on the camera path. Scrolling
+ * within a beat only drifts the camera a little; crossing into the next beat
+ * plays an eased move to that beat's stop (the fly-in through the doors, the
+ * tilt down onto the board, the dive into the die). Scrolling back reverses it.
+ */
+const STOPS = [0.02, 0.3, 0.52, 0.79, 1.0];
+const anim = { from: 0, to: -1, t0: 0, dur: 1 };
+const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+let drift = 0;
 /** Camera-target distance this frame, for depth of field. */
 const camState = { dist: 100 };
 const focus = new Vector3();
@@ -43,8 +55,25 @@ function CameraRig({ onBeat }: { onBeat: (macro: boolean) => void }) {
   }, [scene, env]);
 
   useFrame((state, dt) => {
+    const t = state.clock.elapsedTime;
+    const scroll = introScroll.progress;
+    const beat = beatAt(scroll);
+    const goal = STOPS[beat];
+    if (goal !== anim.to) {
+      // Retarget from wherever the camera is now, so fast scrolling stays smooth.
+      anim.from = anim.to < 0 ? goal : frame.p - drift;
+      anim.to = goal;
+      anim.t0 = t;
+      anim.dur = 0.9 + Math.abs(goal - anim.from) * 4;
+    }
+    const base = anim.from + (anim.to - anim.from) * easeInOut(MathUtils.clamp((t - anim.t0) / anim.dur, 0, 1));
+    // Gentle parallax within the beat, so the scene answers the scroll while it holds.
+    const lo = BEATS[beat];
+    const hi = BEATS[beat + 1] ?? 1;
+    const want = (scroll - (lo + hi) / 2) * 0.1;
     // dt is capped high enough that very slow renderers (software GPUs) still converge within a few frames.
-    frame.p = MathUtils.damp(frame.p, introScroll.progress, 7, Math.min(dt, 0.5));
+    drift = MathUtils.damp(drift, want, 5, Math.min(dt, 0.5));
+    frame.p = MathUtils.clamp(base + drift, 0, 1);
     const p = frame.p;
     const dist = sampleCamera(p, pos, target);
     camState.dist = dist;

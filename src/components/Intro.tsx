@@ -120,7 +120,7 @@ export function Intro() {
       ref={trackRef}
       aria-labelledby="intro-title"
       className="on-dark relative bg-night-950 text-white"
-      style={{ height: mobile ? "460svh" : "560vh" }}
+      style={{ height: mobile ? "380svh" : "440vh" }}
     >
       <div className="sticky top-0 h-svh overflow-hidden">
         {/* Night gradient paints instantly and stays as the fallback if WebGL is unavailable. */}

@@ -81,6 +81,7 @@ With `DEV_LOG_EMAILS=1` and no `EMAIL_API_KEY`, confirmation links are printed t
 
 ## 3D and fallbacks
 
+- The scrub is stepped: each beat has a hero stop on the camera path (`STOPS` in `src/scene/Scene.tsx`). Scrolling within a beat only drifts the camera; crossing into the next beat plays an eased camera move to that beat's stop, and scrolling back reverses it. Beat boundaries stay in `BEATS` (`src/lib/motion.ts`).
 - Page text and CTAs render first. The 3D chunk (~355 KB gzipped, including post-processing) is requested when the browser goes idle. Every texture and environment map is painted on a canvas at runtime; nothing is downloaded.
 - The scene renders in HDR with selective bloom, AgX tone mapping, SMAA, vignette and grain. Desktop adds planar reflections (wet pavement, hall floor), a moonlight shadow map and depth of field in the macro beat.
 - Tiers live in `src/scene/quality.ts`. Mobile gets fewer rack rows and LEDs, lower DPR, MSAA instead of SMAA, and no reflections, shadows or depth of field. drei's `PerformanceMonitor` lowers DPR under load and, on a sustained drop, switches to the degraded tier (which also drops reflections, shadows and DoF). `?force3d` pins the full tier so test shots are comparable.
