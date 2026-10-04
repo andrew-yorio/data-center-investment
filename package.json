@@ -10,7 +10,7 @@
     "pages:dev": "npm run build && wrangler pages dev dist --port 8788",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run server",
     "test:e2e": "playwright test"
   },
   "dependencies": {
