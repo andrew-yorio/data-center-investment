@@ -20,6 +20,29 @@ export async function sendConfirmationEmail(env: Env, to: string, name: string, 
     disclaimer(),
   ].join("\n");
 
+  const from = env.EMAIL_FROM?.trim() || `${BRAND_NAME} <${CONTACT_EMAIL}>`;
+  const html = renderHtml(name, confirmUrl);
+
+  const smtpHost = env.SMTP_HOST?.trim();
+  const smtpUser = env.SMTP_USER?.trim();
+  // Google shows app passwords in groups of four; the spaces aren't part of it.
+  const smtpPass = env.SMTP_PASS?.replace(/\s+/g, "");
+  if (smtpHost && smtpUser && smtpPass) {
+    // Loaded lazily: it imports cloudflare:sockets, which only exists in the Workers runtime.
+    const { WorkerMailer } = await import("worker-mailer");
+    await WorkerMailer.send(
+      {
+        host: smtpHost,
+        port: Number(env.SMTP_PORT ?? 465),
+        secure: (env.SMTP_PORT ?? "465") === "465",
+        credentials: { username: smtpUser, password: smtpPass },
+        authType: "plain",
+      },
+      { from: parseAddress(from), to: to, subject, text, html },
+    );
+    return;
+  }
+
   const apiKey = env.EMAIL_API_KEY?.trim();
   if (!apiKey) {
     if (env.DEV_LOG_EMAILS === "1") {
@@ -33,14 +56,20 @@ export async function sendConfirmationEmail(env: Env, to: string, name: string, 
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({
-      from: env.EMAIL_FROM?.trim() || `${BRAND_NAME} <${CONTACT_EMAIL}>`,
+      from,
       to: [to],
       subject,
       text,
-      html: renderHtml(name, confirmUrl),
+      html,
     }),
   });
   if (!res.ok) throw new Error(`Email send failed: ${res.status} ${await res.text()}`);
+}
+
+/** Splits `Name <addr@x.com>` into the shape worker-mailer expects. */
+function parseAddress(value: string): { name?: string; email: string } {
+  const m = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(value);
+  return m ? { name: m[1].replace(/^"|"$/g, "") || undefined, email: m[2] } : { email: value.trim() };
 }
 
 function esc(s: string): string {

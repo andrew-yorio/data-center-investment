@@ -11,9 +11,16 @@ export interface Env {
   /** Optional override for local testing against a bare PostgREST. Defaults to `${SUPABASE_URL}/rest/v1`. */
   SUPABASE_REST_URL?: string;
   TURNSTILE_SECRET_KEY: string;
+  /** Resend API key. Used when SMTP isn't configured. */
   EMAIL_API_KEY?: string;
-  /** e.g. `Placeholder <hello@yourdomain.com>`; must be a domain verified with the email provider. */
+  /** e.g. `ComputeStake <hello@yourdomain.com>`. With Resend, the domain must be verified there; with Gmail SMTP, use the Gmail address itself. */
   EMAIL_FROM?: string;
+  /** SMTP sending, e.g. Gmail: host smtp.gmail.com, user the Gmail address, pass a Google app password. Takes precedence over Resend when all three are set. */
+  SMTP_HOST?: string;
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
+  /** Defaults to 465 (implicit TLS). */
+  SMTP_PORT?: string;
   /** "1" to log confirmation links instead of sending when EMAIL_API_KEY is unset (local dev only). */
   DEV_LOG_EMAILS?: string;
 }

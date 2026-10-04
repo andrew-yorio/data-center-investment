@@ -39,7 +39,8 @@ A one-page, interest-only site, modeled on a Regulation Crowdfunding "testing th
    | `SUPABASE_SERVICE_ROLE_KEY` | Secret | Never reaches the browser |
    | `TURNSTILE_SECRET_KEY` | Secret | |
    | `EMAIL_API_KEY` | Secret | Resend API key |
-   | `EMAIL_FROM` | Variable | e.g. `Brand <hello@yourdomain.com>`. Kept across deploys by `keep_vars`. |
+   | `EMAIL_FROM` | Secret or variable | e.g. `ComputeStake <hello@yourdomain.com>`; with Gmail, the Gmail address |
+   | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` | Secrets | Optional SMTP sending instead of Resend, e.g. Gmail: `smtp.gmail.com`, the Gmail address, a Google app password. Used when all three are set. |
 
 **Rate limiting:** the `SIGNUP_RATE_LIMITER` binding allows 5 requests per IP per minute at the edge. Behind it, `check_signup_rate_limit()` in Postgres allows 5 attempts per IP per 10 minutes.
 
